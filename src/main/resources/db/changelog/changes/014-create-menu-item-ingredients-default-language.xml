@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="014-create-menu-item-ingredients-default-language" author="Adam Mudrak">
+        <createTable tableName="menu_item_ingredients_default_language">
+            <column name="menu_item_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_menu_item_ingredients_default_language_item"
+                             referencedTableName="menu_items"
+                             referencedColumnNames="id"/>
+            </column>
+            <column name="ingredient" type="VARCHAR(255)"/>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

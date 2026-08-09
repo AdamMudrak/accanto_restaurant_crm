@@ -1,0 +1,63 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-restaurant}
+      MYSQL_USER: ${SPRING_DATASOURCE_USERNAME:-restaurant}
+      MYSQL_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-restaurant}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    environment:
+      SERVER_PORT: "8083"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-restaurant}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-restaurant}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-restaurant}
+      JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY:-local-development-access-secret-at-least-32-bytes}
+      JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY:-local-development-refresh-secret-at-least-32-bytes}
+      RESEND_API_KEY: ${RESEND_API_KEY:-local-resend-api-key}
+      RESEND_DOMAIN_EMAIL: ${RESEND_DOMAIN_EMAIL:-no-reply@example.com}
+      FRONT_BASE_URL: ${FRONT_BASE_URL:-http://localhost:3000}
+      SERVER_PATH: ${SERVER_PATH:-http://localhost:8083}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      SECURITY_COOKIE_LOCAL: ${SECURITY_COOKIE_LOCAL:-true}
+      PAYMENT_MONOBANK_X_TOKEN: ${PAYMENT_MONOBANK_X_TOKEN:-dummy-monobank-token}
+      PAYMENT_MONOBANK_REDIRECT_URL: ${PAYMENT_MONOBANK_REDIRECT_URL:-http://localhost:3000/payment-result}
+      PAYMENT_MONOBANK_WEBHOOK_URL: ${PAYMENT_MONOBANK_WEBHOOK_URL:-http://localhost:8083/payments/webhooks/monobank}
+      PAYMENT_STRIPE_SECRET_KEY: ${PAYMENT_STRIPE_SECRET_KEY:-sk_test_dummy}
+      PAYMENT_STRIPE_SUCCESS_URL: ${PAYMENT_STRIPE_SUCCESS_URL:-http://localhost:3000/payment-success}
+      PAYMENT_STRIPE_CANCEL_URL: ${PAYMENT_STRIPE_CANCEL_URL:-http://localhost:3000/payment-cancel}
+      PAYMENT_STRIPE_WEBHOOK_SECRET: ${PAYMENT_STRIPE_WEBHOOK_SECRET:-whsec_dummy}
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    profiles:
+      - frontend
+    build:
+      context: ../Restaurant-CRM
+      args:
+        VITE_API_URL: http://localhost:8083
+    ports:
+      - "3000:3000"
+    depends_on:
+      - app
+
+volumes:
+  mysql_data:

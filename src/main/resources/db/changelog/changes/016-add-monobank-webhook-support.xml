@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="016-add-monobank-public-keys" author="Adam Mudrak">
+        <createTable tableName="monobank_keys">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_monobank_keys" nullable="false"/>
+            </column>
+            <column name="public_key" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="DATETIME(6)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="016-add-payment-monobank-webhook-fields" author="Adam Mudrak">
+        <addColumn tableName="payments">
+            <column name="provider_modified_at" type="DATETIME(6)"/>
+            <column name="failure_reason" type="VARCHAR(255)"/>
+            <column name="provider_error_code" type="VARCHAR(255)"/>
+            <column name="provider_error_text" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="009-create-orders" author="Adam Mudrak">
+        <createTable tableName="orders">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_orders" nullable="false"/>
+            </column>
+            <column name="uuid" type="VARCHAR(36)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uk_orders_uuid"/>
+            </column>
+            <column name="status" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dining_table_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_orders_dining_table"
+                             referencedTableName="dining_tables"
+                             referencedColumnNames="id"/>
+            </column>
+            <column name="employee_id" type="BIGINT">
+                <constraints foreignKeyName="fk_orders_employee"
+                             referencedTableName="employees"
+                             referencedColumnNames="id"/>
+            </column>
+            <column name="created_at" type="DATETIME(6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="closed_at" type="DATETIME(6)"/>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,25 @@
+# Builder stage
+FROM eclipse-temurin:25-jdk AS builder
+WORKDIR /workspace
+
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml checkstyle.xml ./
+RUN chmod +x ./mvnw
+
+COPY src/ src/
+RUN ./mvnw -DskipTests package
+
+WORKDIR /application
+RUN cp /workspace/target/*.jar application.jar
+RUN java -Djarmode=layertools -jar application.jar extract
+
+# Final stage
+FROM eclipse-temurin:25-jre
+WORKDIR /application
+
+COPY --from=builder /application/dependencies/ ./
+COPY --from=builder /application/spring-boot-loader/ ./
+COPY --from=builder /application/snapshot-dependencies/ ./
+COPY --from=builder /application/application/ ./
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]
+EXPOSE 8083

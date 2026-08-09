@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="005-create-restaurants" author="Adam Mudrak">
+        <createTable tableName="restaurants">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_restaurants" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="logo_id" type="BIGINT">
+                <constraints foreignKeyName="fk_restaurants_logo"
+                             referencedTableName="images"
+                             referencedColumnNames="id"/>
+            </column>
+            <column name="background_image_id" type="BIGINT">
+                <constraints foreignKeyName="fk_restaurants_background_image"
+                             referencedTableName="images"
+                             referencedColumnNames="id"/>
+            </column>
+            <column name="language" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="default_region" type="VARCHAR(255)" defaultValue="UKRAINE">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="currency" type="VARCHAR(255)" defaultValue="UAH">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="payment_provider" type="VARCHAR(255)" defaultValue="MONOBANK">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

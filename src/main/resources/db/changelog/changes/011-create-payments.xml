@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="011-create-payments" author="Adam Mudrak">
+        <createTable tableName="payments">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_payments" nullable="false"/>
+            </column>
+            <column name="order_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_payments_order"
+                             referencedTableName="orders"
+                             referencedColumnNames="id"/>
+            </column>
+            <column name="payer_guest_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_payments_payer_guest"
+                             referencedTableName="guests"
+                             referencedColumnNames="id"/>
+            </column>
+            <column name="amount" type="DECIMAL(12,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tip_amount" type="DECIMAL(12,2)"/>
+            <column name="provider_type" type="VARCHAR(255)" defaultValue="MONOBANK">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(255)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="provider_payment_id" type="VARCHAR(255)">
+                <constraints unique="true" uniqueConstraintName="uk_payments_provider_payment_id"/>
+            </column>
+            <column name="created_at" type="DATETIME(6)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="completed_at" type="DATETIME(6)"/>
+            <column name="sync_attempts" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_sync_attempt_at" type="DATETIME(6)"/>
+            <column name="last_sync_error" type="VARCHAR(1024)"/>
+            <column name="tip_paid" type="TINYINT(1)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tip_paid_at" type="DATETIME(6)"/>
+            <column name="payment_page_url" type="VARCHAR(2048)"/>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

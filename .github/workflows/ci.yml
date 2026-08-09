@@ -1,0 +1,213 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  APP_NAME: restaurant
+  IMAGE_NAME: restaurant
+  APP_PORT: "8083"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: restaurant
+          MYSQL_USER: restaurant
+          MYSQL_PASSWORD: restaurant
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3307/restaurant
+      SPRING_DATASOURCE_USERNAME: restaurant
+      SPRING_DATASOURCE_PASSWORD: restaurant
+      JWT_ACCESS_SECRET_KEY: github-actions-access-secret-key-at-least-32-bytes
+      JWT_REFRESH_SECRET_KEY: github-actions-refresh-secret-key-at-least-32-bytes
+      RESEND_API_KEY: github-actions-placeholder
+      RESEND_DOMAIN_EMAIL: no-reply@example.com
+      FRONT_BASE_URL: http://localhost:3000
+      SERVER_PATH: http://localhost:8080
+      ALLOWED_ORIGINS: http://localhost:3000
+      SECURITY_COOKIE_LOCAL: "true"
+      PAYMENT_MONOBANK_X_TOKEN: github-actions-placeholder
+      PAYMENT_MONOBANK_REDIRECT_URL: https://example.com/accanto/success-redirect
+      PAYMENT_MONOBANK_WEBHOOK_URL: http://localhost:8080/payments/monobank/webhook
+      PAYMENT_STRIPE_SECRET_KEY: github-actions-placeholder
+      PAYMENT_STRIPE_SUCCESS_URL: https://example.com/accanto/stripe-success
+      PAYMENT_STRIPE_CANCEL_URL: https://example.com/accanto/stripe-cancel
+      PAYMENT_STRIPE_WEBHOOK_SECRET: github-actions-placeholder
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Run tests
+        if: github.event_name == 'pull_request'
+        run: ./mvnw -B test
+
+      - name: Package application
+        run: ./mvnw -B package -DskipTests
+
+      - name: Build Docker image
+        if: github.event_name == 'push'
+        run: docker build -t "$IMAGE_NAME:latest" .
+
+      - name: Export Docker image
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p deploy
+          docker save "$IMAGE_NAME:latest" -o "deploy/$APP_NAME.tar"
+
+      - name: Upload image to Hetzner
+        if: github.event_name == 'push'
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+          HETZNER_PORT: ${{ secrets.HETZNER_PORT || '22' }}
+          HETZNER_DEPLOY_PATH: ${{ secrets.HETZNER_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          KEY_FILE="$HOME/.ssh/hetzner_deploy_key"
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+
+          trim_value() {
+            printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+          }
+
+          HOST="$(trim_value "$HETZNER_HOST")"
+          PORT="$(trim_value "$HETZNER_PORT")"
+          TARGET="$(trim_value "$HETZNER_DEPLOY_PATH")"
+
+          rsync -rlgoDzvc \
+            -e "ssh -p $PORT -i $KEY_FILE -o StrictHostKeyChecking=no" \
+            deploy/ \
+            "root@$HOST:$TARGET"
+
+      - name: Restart container on Hetzner
+        if: github.event_name == 'push'
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+          HETZNER_PORT: ${{ secrets.HETZNER_PORT || '22' }}
+          TARGET: ${{ secrets.HETZNER_DEPLOY_PATH }}
+          DOCKER_NETWORK: ${{ secrets.HETZNER_DOCKER_NETWORK }}
+          JWT_ACCESS_SECRET_KEY: ${{ secrets.JWT_ACCESS_SECRET_KEY }}
+          JWT_REFRESH_SECRET_KEY: ${{ secrets.JWT_REFRESH_SECRET_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_DOMAIN_EMAIL: restaurant@adammudrak.pp.ua
+          FRONT_BASE_URL: https://irynamariiko-frontend.accanto.adammudrak.pp.ua
+          SERVER_PATH: https://accanto.adammudrak.pp.ua
+          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+          SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
+          SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
+          SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+          SECURITY_COOKIE_LOCAL: ${{ secrets.SECURITY_COOKIE_LOCAL }}
+          PAYMENT_MONOBANK_X_TOKEN: ${{ secrets.PAYMENT_MONOBANK_X_TOKEN }}
+          PAYMENT_MONOBANK_REDIRECT_URL: https://example.com/accanto/success-redirect
+          PAYMENT_MONOBANK_WEBHOOK_URL: https://accanto.adammudrak.pp.ua/payments/monobank/webhook
+          PAYMENT_STRIPE_SECRET_KEY: ${{ secrets.PAYMENT_STRIPE_SECRET_KEY }}
+          PAYMENT_STRIPE_SUCCESS_URL: https://example.com/accanto/stripe-success
+          PAYMENT_STRIPE_CANCEL_URL: https://example.com/accanto/stripe-cancel
+          PAYMENT_STRIPE_WEBHOOK_SECRET: ${{ secrets.PAYMENT_STRIPE_WEBHOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          trim_value() {
+            printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+          }
+
+          DEPLOY_VARS="APP_NAME IMAGE_NAME APP_PORT TARGET DOCKER_NETWORK JWT_ACCESS_SECRET_KEY JWT_REFRESH_SECRET_KEY RESEND_API_KEY RESEND_DOMAIN_EMAIL FRONT_BASE_URL SERVER_PATH ALLOWED_ORIGINS SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD SECURITY_COOKIE_LOCAL PAYMENT_MONOBANK_X_TOKEN PAYMENT_MONOBANK_REDIRECT_URL PAYMENT_MONOBANK_WEBHOOK_URL PAYMENT_STRIPE_SECRET_KEY PAYMENT_STRIPE_SUCCESS_URL PAYMENT_STRIPE_CANCEL_URL PAYMENT_STRIPE_WEBHOOK_SECRET"
+          for var in HETZNER_HOST HETZNER_PORT $DEPLOY_VARS; do
+            printf -v "$var" '%s' "$(trim_value "${!var-}")"
+          done
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          KEY_FILE="$HOME/.ssh/hetzner_deploy_key"
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+
+          REMOTE_SCRIPT="$(mktemp)"
+          {
+            echo 'set -e'
+            for var in $DEPLOY_VARS; do
+              printf 'export %s=%q\n' "$var" "${!var-}"
+            done
+            cat <<'REMOTE_SCRIPT_BODY'
+            docker load -i "$TARGET/$APP_NAME.tar"
+            docker rm -f "$APP_NAME" 2>/dev/null || true
+
+            ENV_FILE_ARG=""
+            if [ -f "$TARGET/.env" ]; then
+              ENV_FILE_ARG="--env-file $TARGET/.env"
+            fi
+
+            NETWORK_ARG=""
+            if [ -n "$DOCKER_NETWORK" ]; then
+              NETWORK_ARG="--network $DOCKER_NETWORK"
+            fi
+
+            docker run -d \
+              --name "$APP_NAME" \
+              --restart unless-stopped \
+              $ENV_FILE_ARG \
+              $NETWORK_ARG \
+              -e SERVER_PORT="$APP_PORT" \
+              -e JWT_ACCESS_SECRET_KEY="$JWT_ACCESS_SECRET_KEY" \
+              -e JWT_REFRESH_SECRET_KEY="$JWT_REFRESH_SECRET_KEY" \
+              -e RESEND_API_KEY="$RESEND_API_KEY" \
+              -e RESEND_DOMAIN_EMAIL="$RESEND_DOMAIN_EMAIL" \
+              -e FRONT_BASE_URL="$FRONT_BASE_URL" \
+              -e SERVER_PATH="$SERVER_PATH" \
+              -e ALLOWED_ORIGINS="$ALLOWED_ORIGINS" \
+              -e SPRING_DATASOURCE_URL="$SPRING_DATASOURCE_URL" \
+              -e SPRING_DATASOURCE_USERNAME="$SPRING_DATASOURCE_USERNAME" \
+              -e SPRING_DATASOURCE_PASSWORD="$SPRING_DATASOURCE_PASSWORD" \
+              -e SECURITY_COOKIE_LOCAL="$SECURITY_COOKIE_LOCAL" \
+              -e PAYMENT_MONOBANK_X_TOKEN="$PAYMENT_MONOBANK_X_TOKEN" \
+              -e PAYMENT_MONOBANK_REDIRECT_URL="$PAYMENT_MONOBANK_REDIRECT_URL" \
+              -e PAYMENT_MONOBANK_WEBHOOK_URL="$PAYMENT_MONOBANK_WEBHOOK_URL" \
+              -e PAYMENT_STRIPE_SECRET_KEY="$PAYMENT_STRIPE_SECRET_KEY" \
+              -e PAYMENT_STRIPE_SUCCESS_URL="$PAYMENT_STRIPE_SUCCESS_URL" \
+              -e PAYMENT_STRIPE_CANCEL_URL="$PAYMENT_STRIPE_CANCEL_URL" \
+              -e PAYMENT_STRIPE_WEBHOOK_SECRET="$PAYMENT_STRIPE_WEBHOOK_SECRET" \
+              -p "$APP_PORT:$APP_PORT" \
+              "$IMAGE_NAME:latest"
+
+            rm -f "$TARGET/$APP_NAME.tar"
+          REMOTE_SCRIPT_BODY
+          } > "$REMOTE_SCRIPT"
+
+          ssh -p "$HETZNER_PORT" \
+            -i "$KEY_FILE" \
+            -o StrictHostKeyChecking=no \
+            "root@$HETZNER_HOST" \
+            'bash -s' < "$REMOTE_SCRIPT"

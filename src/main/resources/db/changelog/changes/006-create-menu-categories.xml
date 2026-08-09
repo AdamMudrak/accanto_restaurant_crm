@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="006-create-menu-categories" author="Adam Mudrak">
+        <createTable tableName="menu_categories">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_menu_categories" nullable="false"/>
+            </column>
+            <column name="name_default_language" type="VARCHAR(255)"/>
+            <column name="name_second_language" type="VARCHAR(255)"/>
+            <column name="parent_id" type="BIGINT">
+                <constraints foreignKeyName="fk_menu_categories_parent"
+                             referencedTableName="menu_categories"
+                             referencedColumnNames="id"/>
+            </column>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>
