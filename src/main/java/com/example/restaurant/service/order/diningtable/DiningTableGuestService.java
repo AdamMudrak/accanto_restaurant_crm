@@ -3,10 +3,10 @@ package com.example.restaurant.service.order.diningtable;
 import com.example.restaurant.entity.order.DiningTable;
 import com.example.restaurant.entity.order.Guest;
 import com.example.restaurant.entity.order.Order;
-import com.example.restaurant.exception.types.conflict.GuestIllegalStateException;
 import com.example.restaurant.exception.types.notfound.DiningTableNotFoundException;
 import com.example.restaurant.mapper.order.GuestMapper;
 import com.example.restaurant.mapper.order.OrderMapper;
+import com.example.restaurant.repository.management.RestaurantRepository;
 import com.example.restaurant.repository.order.DiningTableRepository;
 import com.example.restaurant.repository.order.GuestRepository;
 import com.example.restaurant.repository.order.OrderRepository;
@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class DiningTableGuestService {
     private final OrderRepository orderRepository;
+    private final RestaurantRepository restaurantRepository;
     private final OrderMapper orderMapper;
     private final GuestRepository guestRepository;
     private final GuestMapper guestMapper;
@@ -40,16 +41,22 @@ public class DiningTableGuestService {
     public void interactWithTableByQrUuid(String tableUuid,
                                           HttpServletRequest request,
                                           HttpServletResponse response) {
+        restaurantRepository.lockSingleton().orElseThrow();
         DiningTable diningTable = diningTableRepository
                 .findByQrUuidAndIsActiveTrue(tableUuid).orElseThrow(
                         () -> new DiningTableNotFoundException(
                                 "Active dining table with uuid " + tableUuid + " not found"));
 
-        Optional<Order> optionalOrder = orderRepository
-                .findByDiningTableIdAndStatus(diningTable.getId(), Order.OrderStatus.OPENED);
+        Optional<Long> optionalOrder = orderRepository
+                .findOpenOrderIdByTableId(diningTable.getId());
 
         if (optionalOrder.isPresent()) {
-            joinOrder(tableUuid, optionalOrder.get(), request, response);
+            Order order = orderRepository.lockById(optionalOrder.get()).orElseThrow();
+            if (order.getStatus() == Order.OrderStatus.OPENED) {
+                joinOrder(tableUuid, order, request, response);
+            } else {
+                initializeOrder(tableUuid, diningTable.getId(), response);
+            }
         } else {
             initializeOrder(tableUuid, diningTable.getId(), response);
         }
@@ -60,14 +67,9 @@ public class DiningTableGuestService {
                            HttpServletRequest request,
                            HttpServletResponse response) {
         Optional<Guest> guest = findGuestByRequestCookie(request);
-        if (guest.isEmpty()) {
+        if (guest.isEmpty() || !guest.get().getOrder().getId().equals(order.getId())) {
             createGuestAndAddCookies(order, tableUuid, response);
             return;
-        }
-
-        if (!guest.get().getOrder().getId().equals(order.getId())) {
-            throw new GuestIllegalStateException("Guest " + guest.get().getId()
-                    + " is not associated with order id " + order.getId());
         }
 
         addCookies(guest.get(), tableUuid, order, response);

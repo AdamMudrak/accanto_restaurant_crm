@@ -78,6 +78,14 @@ configured.
 
 ## Local startup
 
+Integration tests can run individually or as a suite with a shared MySQL and Spring
+context. See [integration testing](docs/integration-tests.md) for commands and the
+business scenario inventory.
+
+See [frontend API changes](docs/frontend-api-changes.uk.md) for payment, currency,
+employee deletion, review, and other API changes. Local Compose explicitly enables
+demo data; production migrations preserve existing data.
+
 See [RUN_ME.md](RUN_ME.md) for the exact local Docker commands.
 
 Short version:

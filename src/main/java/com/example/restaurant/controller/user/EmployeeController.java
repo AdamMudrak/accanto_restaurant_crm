@@ -34,6 +34,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,6 +53,17 @@ import org.springframework.web.multipart.MultipartFile;
         description = "Employee profile, list, update, and email-change endpoints.")
 public class EmployeeController {
     private final EmployeeService employeeService;
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN_EMPLOYEE')")
+    @Operation(summary = "Soft-delete employee",
+            description = "Preserves history. Rejects the last active administrator and employees "
+                    + "with open orders. Repeated deletion succeeds.",
+            security = @SecurityRequirement(name = "accessTokenCookie"))
+    public ResponseEntity<ApiResponse<Void>> deleteEmployee(@PathVariable @Positive Long id) {
+        employeeService.deleteEmployee(id);
+        return ResponseEntity.ok(ApiResponse.emptySuccess("Employee deleted."));
+    }
 
     @Operation(
             summary = "Get employee",

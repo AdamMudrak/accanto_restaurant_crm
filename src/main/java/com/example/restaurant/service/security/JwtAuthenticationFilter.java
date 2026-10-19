@@ -88,7 +88,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private void setAuthentication(String accessToken, HttpServletResponse response) {
         String username = jwtAccessUtil.getUsername(accessToken);
-        if (employeeRepository.existsByEmailAndIsDeletedTrue(username)) {
+        if (employeeRepository.findByEmail(username)
+                .filter(employee -> !employee.isDeleted() && employee.isEmailConfirmed())
+                .isEmpty()) {
             cookieRemover.removeAllTokenCookies(response);
             SecurityContextHolder.clearContext();
         } else {

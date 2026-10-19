@@ -4,9 +4,11 @@ import com.example.restaurant.dto.response.ApiResponse;
 import com.example.restaurant.dto.response.analytics.CashlessTipPaymentResponse;
 import com.example.restaurant.dto.response.analytics.EmployeeTipsResponse;
 import com.example.restaurant.dto.response.analytics.MonthlyAnalyticsResponse;
+import com.example.restaurant.dto.response.analytics.RevenueSummaryResponse;
 import com.example.restaurant.dto.response.list.analytics.CashlessTipPaymentListResponse;
 import com.example.restaurant.dto.response.list.order.OrderListResponse;
 import com.example.restaurant.dto.response.order.OrderResponse;
+import com.example.restaurant.entity.management.Restaurant;
 import com.example.restaurant.entity.order.Order;
 import com.example.restaurant.service.management.AdminAnalyticsService;
 import com.example.restaurant.service.order.order.OrderEmployeeService;
@@ -100,12 +102,26 @@ public class AdminAnalyticsController {
             @Parameter(description = "Analytics year.", example = "2026")
             @RequestParam @Min(MIN_ANALYTICS_YEAR) int year,
             @Parameter(description = "Analytics month number from 1 to 12.", example = "8")
-            @RequestParam @Min(MIN_MONTH) @Max(MAX_MONTH) int month) {
+            @RequestParam @Min(MIN_MONTH) @Max(MAX_MONTH) int month,
+            @Parameter(description = "Currency filter; defaults to restaurant currency.")
+            @RequestParam(required = false) Restaurant.Currency currency) {
         return new ResponseEntity<>(
                 ApiResponse.success(
                         "Successfully retrieved monthly analytics.",
-                        adminAnalyticsService.getMonthlySummary(year, month)),
+                        adminAnalyticsService.getMonthlySummary(year, month, currency)),
                 HttpStatus.OK);
+    }
+
+    @GetMapping("/revenue-summary")
+    @PreAuthorize("hasRole('ADMIN_EMPLOYEE')")
+    @Operation(summary = "Get monthly cash and online revenue by currency",
+            description = "Separate revenue and tips, payment and distinct order counts. "
+                    + "Unresolved historical count covers all dates; null currency means unknown.")
+    public ApiResponse<RevenueSummaryResponse> getRevenueSummary(
+            @RequestParam @Min(MIN_ANALYTICS_YEAR) int year,
+            @RequestParam @Min(MIN_MONTH) @Max(MAX_MONTH) int month) {
+        return ApiResponse.success("Revenue summary.",
+                adminAnalyticsService.getRevenueSummary(year, month));
     }
 
     @PreAuthorize("hasRole('ADMIN_EMPLOYEE')")

@@ -14,6 +14,7 @@ import static com.example.restaurant.controller.openapi.ManagementOpenApiExample
 import com.example.restaurant.dto.request.order.AddOrderItemEmployeeRequest;
 import com.example.restaurant.dto.request.order.AddOrderItemRequest;
 import com.example.restaurant.dto.request.order.CloseOrderManuallyRequest;
+import com.example.restaurant.dto.request.order.ReassignOrderRequest;
 import com.example.restaurant.dto.request.order.UpdateOrderItemEmployeeRequest;
 import com.example.restaurant.dto.request.order.UpdateOrderItemRequest;
 import com.example.restaurant.dto.response.ApiResponse;
@@ -66,6 +67,16 @@ public class OrderController {
     private final OrderGuestService orderGuestService;
     private final OrderEmployeeService orderEmployeeService;
     private final PaymentService paymentService;
+
+    @PutMapping("/{id}/employee")
+    @PreAuthorize("hasRole('ADMIN_EMPLOYEE')")
+    @Operation(summary = "Reassign an open order to an active employee",
+            security = @SecurityRequirement(name = "accessTokenCookie"))
+    public ApiResponse<OrderResponse> reassignEmployee(@PathVariable @Positive Long id,
+            @Valid @RequestBody ReassignOrderRequest request) {
+        return ApiResponse.success("Order reassigned.",
+                orderEmployeeService.reassignEmployee(id, request.employeeId()));
+    }
 
     @Operation(
             summary = "List opened orders",
@@ -612,11 +623,12 @@ public class OrderController {
     @PutMapping("/{id}/close-manually")
     public ResponseEntity<ApiResponse<OrderResponse>> closeOrderManually(
             @PathVariable @Positive Long id,
-            @Valid @RequestBody CloseOrderManuallyRequest request) {
+            @Valid @RequestBody CloseOrderManuallyRequest request,
+            @AuthenticationPrincipal Employee employee) {
         return new ResponseEntity<>(
                 ApiResponse.success(
                         "Successfully closed order manually.",
-                        orderEmployeeService.closeOrderManually(id, request)),
+                        orderEmployeeService.closeOrderManually(id, request, employee)),
                 HttpStatus.OK);
     }
 }

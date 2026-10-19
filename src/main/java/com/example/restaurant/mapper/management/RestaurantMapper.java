@@ -15,7 +15,8 @@ public class RestaurantMapper {
                 restaurant.getDefaultRegion(),
                 restaurant.getLanguage(),
                 restaurant.getCurrency(),
-                restaurant.getPaymentProvider()
+                restaurant.getPaymentProvider(),
+                restaurant.getTimeZone()
         );
     }
 

@@ -1,5 +1,6 @@
 package com.example.restaurant.entity.order;
 
+import com.example.restaurant.entity.management.Restaurant;
 import com.example.restaurant.entity.user.Employee;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,6 +27,9 @@ public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Enumerated(EnumType.STRING)
+    @Column(updatable = false)
+    private Restaurant.Currency currency;
     @Column(nullable = false, unique = true)
     private String uuid;
     @Enumerated(EnumType.STRING)

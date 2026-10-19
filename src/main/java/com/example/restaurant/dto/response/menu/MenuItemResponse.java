@@ -1,5 +1,6 @@
 package com.example.restaurant.dto.response.menu;
 
+import com.example.restaurant.entity.management.Restaurant;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
@@ -48,5 +49,7 @@ public record MenuItemResponse(
                 nullable = true)
         Long imageId,
         @Schema(description = "Child menu category identifier.", example = "3")
-        Long childCategoryId
+        Long childCategoryId,
+        @Schema(description = "Menu price currency.", example = "UAH")
+        Restaurant.Currency currency
 ) {}

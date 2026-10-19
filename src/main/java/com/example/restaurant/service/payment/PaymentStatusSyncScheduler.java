@@ -7,13 +7,14 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class PaymentStatusSyncScheduler {
-    private static final long PAYMENT_STATUS_SYNC_DELAY_MILLIS = 300000L;
     private final PaymentService paymentService;
+    private final PaymentOperationsService operations;
 
     @Scheduled(
-            fixedDelay = PAYMENT_STATUS_SYNC_DELAY_MILLIS,
-            initialDelay = PAYMENT_STATUS_SYNC_DELAY_MILLIS)
+            fixedDelayString = "${payment.sync.delay-ms:300000}",
+            initialDelayString = "${payment.sync.initial-delay-ms:300000}")
     public void syncPendingPayments() {
         paymentService.syncPendingPayments();
+        operations.syncPendingRefunds();
     }
 }

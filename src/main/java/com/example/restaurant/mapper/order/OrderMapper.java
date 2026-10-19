@@ -3,17 +3,22 @@ package com.example.restaurant.mapper.order;
 import com.example.restaurant.dto.response.order.OrderResponse;
 import com.example.restaurant.entity.order.DiningTable;
 import com.example.restaurant.entity.order.Order;
+import com.example.restaurant.repository.management.RestaurantRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class OrderMapper {
+    private final RestaurantRepository restaurantRepository;
 
     public Order toCreateOrder(Long diningTableId) {
         Order order = new Order();
+        order.setCurrency(restaurantRepository.findSingleton().orElseThrow().getCurrency());
         order.setDiningTable(createDiningTable(diningTableId));
         order.setUuid(UUID.randomUUID().toString());
         order.setCreatedAt(LocalDateTime.now());
@@ -24,6 +29,7 @@ public class OrderMapper {
     public OrderResponse toOrderResponse(Order order) {
         OrderResponse orderResponse = new OrderResponse();
         orderResponse.setId(order.getId());
+        orderResponse.setCurrency(order.getCurrency());
         orderResponse.setUuid(order.getUuid());
         orderResponse.setOrderStatus(order.getStatus());
         orderResponse.setDiningTableId(order.getDiningTable().getId());

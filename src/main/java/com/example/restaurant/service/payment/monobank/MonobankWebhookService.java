@@ -1,13 +1,12 @@
 package com.example.restaurant.service.payment.monobank;
 
 import com.example.restaurant.entity.payment.Payment;
+import com.example.restaurant.exception.types.badrequest.MalformedWebhookException;
 import com.example.restaurant.exception.types.unauthorized.InvalidTokenException;
 import com.example.restaurant.repository.payment.PaymentRepository;
-import com.example.restaurant.service.payment.PaymentOrderItemService;
+import com.example.restaurant.service.payment.PaymentSettlementService;
 import com.example.restaurant.service.payment.monobank.dto.request.MonobankWebhookRequest;
 import com.example.restaurant.service.utils.JsonConverter;
-import jakarta.persistence.EntityNotFoundException;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,32 +18,33 @@ public class MonobankWebhookService {
     private final MonobankPublicKeyService publicKeyService;
     private final MonobankWebhookSignatureVerifier signatureVerifier;
     private final JsonConverter jsonConverter;
-    private final PaymentOrderItemService paymentOrderItemService;
+    private final PaymentSettlementService settlementService;
 
     @Transactional
     public void handle(String rawBody, String signature) {
         verifySignature(rawBody, signature);
 
-        MonobankWebhookRequest webhook = jsonConverter.fromJson(
-                rawBody, MonobankWebhookRequest.class);
-        Payment payment = paymentRepository.findByProviderPaymentId(webhook.invoiceId())
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Payment with monobank invoiceId " + webhook.invoiceId() + " not found"));
+        MonobankWebhookRequest webhook;
+        try {
+            webhook = jsonConverter.fromJson(rawBody, MonobankWebhookRequest.class);
+        } catch (IllegalArgumentException exception) {
+            throw new MalformedWebhookException();
+        }
+        if (webhook == null || webhook.invoiceId() == null || webhook.invoiceId().isBlank()
+                || webhook.status() == null) {
+            throw new MalformedWebhookException();
+        }
+        Payment payment = settlementService.lockByProviderId(webhook.invoiceId());
 
         if (isOldWebhook(payment, webhook)) {
             return;
         }
 
-        payment.setStatus(toPaymentStatus(webhook.status()));
-        payment.setProviderModifiedAt(webhook.modifiedDate());
+        settlementService.applyStatus(payment, toPaymentStatus(webhook.status()),
+                webhook.modifiedDate());
         payment.setFailureReason(webhook.failureReason());
         payment.setProviderErrorCode(webhook.errCode());
         payment.setProviderErrorText(webhook.errText());
-
-        if (webhook.status() == MonobankWebhookRequest.Status.success) {
-            payment.setCompletedAt(LocalDateTime.now());
-            paymentOrderItemService.markItemsAsPaid(payment);
-        }
 
         paymentRepository.save(payment);
     }
@@ -66,7 +66,7 @@ public class MonobankWebhookService {
     private boolean isOldWebhook(Payment payment, MonobankWebhookRequest webhook) {
         return payment.getProviderModifiedAt() != null
                 && webhook.modifiedDate() != null
-                && !webhook.modifiedDate().isAfter(payment.getProviderModifiedAt());
+                && webhook.modifiedDate().isBefore(payment.getProviderModifiedAt());
     }
 
     private Payment.PaymentStatus toPaymentStatus(MonobankWebhookRequest.Status status) {

@@ -42,6 +42,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentController {
     private final PaymentService paymentService;
 
+    @GetMapping("/reconciliation")
+    @PreAuthorize("hasRole('ADMIN_EMPLOYEE')")
+    @Operation(summary = "List payments requiring administrator reconciliation")
+    public ApiResponse<ApiResponse.PageResponse<PaymentResponse>> reconciliation(
+            Pageable pageable) {
+        var result = paymentService.getPaymentsNeedingReconciliation(pageable);
+        return ApiResponse.pageSuccess("Payments requiring review.", result.items(),
+                result.pageNumber(), result.pageSize(), result.totalElements());
+    }
+
+    @PostMapping("/{id}/sync")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPLOYEE', 'EMPLOYEE')")
+    @Operation(summary = "Synchronize an online payment with its provider",
+            description = "A failed provider request keeps the payment unresolved. "
+                    + "Check status and last synchronization error before accepting cash.",
+            security = @SecurityRequirement(name = "accessTokenCookie"))
+    public ApiResponse<PaymentResponse> syncPayment(@PathVariable @Positive Long id) {
+        return ApiResponse.success("Payment synchronization attempted.",
+                paymentService.syncPayment(id));
+    }
+
     @Operation(
             summary = "List payments",
             description = "Returns paginated payments for CRM.",

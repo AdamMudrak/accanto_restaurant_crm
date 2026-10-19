@@ -5,17 +5,10 @@ import java.time.OffsetDateTime;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record MonobankStatusResponse(
-        String invoiceId,
         Status status,
         String failureReason,
         String errCode,
         String errText,
-        Long amount,
-        Integer ccy,
-        Long finalAmount,
-        String reference,
-        String destination,
-        OffsetDateTime createdDate,
         OffsetDateTime modifiedDate
 ) {
     public enum Status {

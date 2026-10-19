@@ -1,5 +1,6 @@
 package com.example.restaurant.dto.response.analytics;
 
+import com.example.restaurant.entity.management.Restaurant;
 import com.example.restaurant.service.payment.PaymentProviderType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
@@ -28,5 +29,6 @@ public record CashlessTipPaymentResponse(
         @Schema(description = "Date and time when the tip was marked as paid.")
         LocalDateTime tipPaidAt,
         @Schema(description = "Date and time when the payment was completed.")
-        LocalDateTime completedAt
+        LocalDateTime completedAt,
+        Restaurant.Currency currency
 ) {}

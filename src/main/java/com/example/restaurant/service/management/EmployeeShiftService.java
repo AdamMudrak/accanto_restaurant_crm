@@ -10,6 +10,7 @@ import com.example.restaurant.exception.types.conflict.TimeConflictException;
 import com.example.restaurant.exception.types.notfound.EmployeeShiftNotFoundException;
 import com.example.restaurant.mapper.management.EmployeeShiftMapper;
 import com.example.restaurant.repository.management.EmployeeShiftRepository;
+import com.example.restaurant.repository.management.RestaurantRepository;
 import com.example.restaurant.repository.user.EmployeeRepository;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDate;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class EmployeeShiftService {
     private final EmployeeShiftRepository employeeShiftRepository;
     private final EmployeeRepository employeeRepository;
+    private final RestaurantRepository restaurantRepository;
     private final EmployeeShiftMapper employeeShiftMapper;
 
     @Transactional(readOnly = true)
@@ -110,7 +112,8 @@ public class EmployeeShiftService {
     }
 
     private Employee findEmployeeById(Long employeeId) {
-        return employeeRepository.findById(employeeId)
+        restaurantRepository.lockSingleton().orElseThrow();
+        return employeeRepository.findById(employeeId).filter(employee -> !employee.isDeleted())
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Employee with id " + employeeId + " not found."));
     }

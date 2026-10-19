@@ -9,7 +9,5 @@ public record StripeCheckoutSessionResponse(
         String url,
         String status,
         @JsonProperty("payment_status")
-        String paymentStatus,
-        @JsonProperty("client_reference_id")
-        String clientReferenceId
+        String paymentStatus
 ) {}

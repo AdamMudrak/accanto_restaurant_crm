@@ -7,13 +7,18 @@ import com.example.restaurant.dto.request.user.UpdateEmployeeRequest;
 import com.example.restaurant.dto.response.list.user.EmployeeListResponse;
 import com.example.restaurant.dto.response.user.EmployeeResponse;
 import com.example.restaurant.entity.image.Image;
+import com.example.restaurant.entity.order.Order;
 import com.example.restaurant.entity.token.UuidToken;
 import com.example.restaurant.entity.user.Employee;
+import com.example.restaurant.entity.user.Role;
 import com.example.restaurant.exception.types.conflict.EmployeeEmailAlreadyExistsException;
 import com.example.restaurant.exception.types.conflict.NoPendingEmailException;
+import com.example.restaurant.exception.types.conflict.OrderIllegalStateException;
 import com.example.restaurant.exception.types.conflict.PendingEmailAlreadyExistsException;
 import com.example.restaurant.exception.types.forbidden.SelfModificationNotAllowedException;
 import com.example.restaurant.mapper.user.EmployeeMapper;
+import com.example.restaurant.repository.management.RestaurantRepository;
+import com.example.restaurant.repository.order.OrderRepository;
 import com.example.restaurant.repository.user.EmployeeRepository;
 import com.example.restaurant.service.email.ActionEmailService;
 import com.example.restaurant.service.email.emailfactories.EmailStrategy;
@@ -37,6 +42,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class EmployeeService {
     private static final String CHANGE_EMAIL_PATH = "/employees/finalize-email-change";
     private final EmployeeRepository employeeRepository;
+    private final OrderRepository orderRepository;
+    private final RestaurantRepository restaurantRepository;
     private final EmployeeMapper employeeMapper;
     private final EmployeeUtils employeeUtils;
     private final ActionEmailService actionEmailService;
@@ -52,7 +59,7 @@ public class EmployeeService {
 
     public EmployeeListResponse getEmployees(
             Pageable pageable) {
-        Page<Employee> employees = employeeRepository.findAll(pageable);
+        Page<Employee> employees = employeeRepository.findAllByIsDeletedFalse(pageable);
         List<EmployeeResponse> employeeResponses = employeeMapper.toResponse(employees.toList());
         int pageNumber = pageable.getPageNumber();
         int pageSize = pageable.getPageSize();
@@ -69,8 +76,11 @@ public class EmployeeService {
     public EmployeeResponse updateEmployeeById(
             Long authenticatedUserId, Long id,
             UpdateEmployeeRequest request, MultipartFile profilePicture) {
+        restaurantRepository.lockSingleton().orElseThrow();
         Employee employee = employeeUtils.getEmployeeById(id);
         if (request != null) {
+            validateRemoval(employee, Boolean.TRUE.equals(request.isDeleted()),
+                    Boolean.FALSE.equals(request.isAdmin()));
             updatePresentFields(authenticatedUserId, id, request, employee);
         }
         employee.setUpdatedAt(LocalDateTime.now());
@@ -92,6 +102,35 @@ public class EmployeeService {
         }
 
         return employeeMapper.toResponse(employeeRepository.save(employee));
+    }
+
+    public void deleteEmployee(Long id) {
+        restaurantRepository.lockSingleton().orElseThrow();
+        Employee employee = employeeUtils.getEmployeeById(id);
+        if (employee.isDeleted()) {
+            return;
+        }
+        validateRemoval(employee, true, false);
+        employee.setDeleted(true);
+        employee.setUpdatedAt(LocalDateTime.now());
+        employeeRepository.save(employee);
+    }
+
+    private void validateRemoval(Employee employee, boolean deleting, boolean demoting) {
+        if (employee.isDeleted() || (!deleting && !demoting)) {
+            return;
+        }
+        if (employee.isEmailConfirmed()
+                && employee.getRole().getName() == Role.RoleType.ROLE_ADMIN_EMPLOYEE
+                && employeeRepository.countByIsDeletedFalseAndEmailConfirmedTrueAndRole_Name(
+                        Role.RoleType.ROLE_ADMIN_EMPLOYEE) <= 1) {
+            throw new OrderIllegalStateException("Cannot remove the last active administrator.");
+        }
+        if (deleting && orderRepository.existsByEmployeeIdAndStatus(
+                employee.getId(), Order.OrderStatus.OPENED)) {
+            throw new OrderIllegalStateException(
+                    "Reassign or close the employee's open orders before deletion.");
+        }
     }
 
     public EmployeeResponse finalizeEmailChange(

@@ -1,6 +1,8 @@
 package com.example.restaurant.dto.response.order;
 
 import com.example.restaurant.entity.order.OrderItem;
+import com.example.restaurant.entity.payment.Payment;
+import com.example.restaurant.entity.payment.PaymentRefund;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 
@@ -25,5 +27,8 @@ public record OrderItemResponse(
         @Schema(description = "Optional guest comment.", example = "No onions please")
         String clientComment,
         @Schema(description = "Optional internal employee comment.", example = "Fire with mains")
-        String employeeComment
+        String employeeComment,
+        OrderItem.FulfillmentStatus fulfillmentStatus,
+        Payment.PaymentStatus paymentStatus,
+        PaymentRefund.Status refundStatus
 ) {}

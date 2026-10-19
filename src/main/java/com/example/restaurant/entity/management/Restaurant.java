@@ -47,6 +47,9 @@ public class Restaurant {
     @Column(nullable = false)
     private PaymentProviderType paymentProvider = PaymentProviderType.MONOBANK;
 
+    @Column(nullable = false, length = 64)
+    private String timeZone = "Europe/Kyiv";
+
     public enum DefaultRegion {
         EUROPE,
         UKRAINE
