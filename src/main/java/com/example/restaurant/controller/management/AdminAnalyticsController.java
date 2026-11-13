@@ -116,7 +116,10 @@ public class AdminAnalyticsController {
     @PreAuthorize("hasRole('ADMIN_EMPLOYEE')")
     @Operation(summary = "Get monthly cash and online revenue by currency",
             description = "Separate revenue and tips, payment and distinct order counts. "
-                    + "Unresolved historical count covers all dates; null currency means unknown.")
+                    + "Unresolved historical count covers all dates; null currency means unknown. "
+                    + "Month boundaries use restaurant time zone; timestamps are UTC. "
+                    + "ADMIN_EMPLOYEE only.",
+            security = @SecurityRequirement(name = "accessTokenCookie"))
     public ApiResponse<RevenueSummaryResponse> getRevenueSummary(
             @RequestParam @Min(MIN_ANALYTICS_YEAR) int year,
             @RequestParam @Min(MIN_MONTH) @Max(MAX_MONTH) int month) {

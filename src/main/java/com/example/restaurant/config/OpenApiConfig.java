@@ -19,7 +19,11 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("Restaurant API")
-                        .description("API for restaurant employee authentication and management.")
+                        .description("Restaurant guest ordering, authentication, menu and "
+                    + "table management, "
+                                + "payments, refunds, reviews, scheduling, and analytics. "
+                                + "CRM routes use the accessToken cookie; guest order and payment "
+                                + "flows use guestUuid and orderUuid cookies from QR entry.")
                         .version("v1"))
                 .components(new Components()
                         .addSecuritySchemes(
