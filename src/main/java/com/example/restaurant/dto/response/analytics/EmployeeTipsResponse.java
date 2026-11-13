@@ -1,5 +1,6 @@
 package com.example.restaurant.dto.response.analytics;
 
+import com.example.restaurant.entity.management.Restaurant;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 
@@ -18,5 +19,6 @@ public record EmployeeTipsResponse(
         @Schema(description = "Cashless tips not yet marked as paid.", example = "60.00")
         BigDecimal unpaidTipAmount,
         @Schema(description = "Number of cashless payments with tips.", example = "4")
-        long paymentCount
+        long paymentCount,
+        Restaurant.Currency currency
 ) {}

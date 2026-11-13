@@ -56,7 +56,11 @@ public class OrderItemMapper {
                 orderItem.getQuantity(),
                 orderItem.getStatus(),
                 orderItem.getClientNote(),
-                orderItem.getEmployeeNote()
+                orderItem.getEmployeeNote(),
+                orderItem.getFulfillmentStatus(),
+                orderItem.getPayment() == null ? null : orderItem.getPayment().getStatus(),
+                orderItem.getPayment() == null || orderItem.getPayment().getRefund() == null
+                        ? null : orderItem.getPayment().getRefund().getStatus()
         );
     }
 

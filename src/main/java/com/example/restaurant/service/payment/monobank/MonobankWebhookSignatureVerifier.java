@@ -1,6 +1,5 @@
 package com.example.restaurant.service.payment.monobank;
 
-import com.example.restaurant.exception.types.internalserver.MonobankPaymentProviderException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.PublicKey;
@@ -27,8 +26,7 @@ public class MonobankWebhookSignatureVerifier {
 
             return signature.verify(signatureBytes);
         } catch (Exception exception) {
-            throw new MonobankPaymentProviderException(
-                    "Failed to verify monobank webhook signature: " + exception.getMessage());
+            return false;
         }
     }
 

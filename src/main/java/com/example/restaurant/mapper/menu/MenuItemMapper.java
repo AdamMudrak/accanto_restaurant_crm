@@ -3,24 +3,36 @@ package com.example.restaurant.mapper.menu;
 import com.example.restaurant.dto.request.menu.MenuItemRequest;
 import com.example.restaurant.dto.request.menu.UpdateMenuItemRequest;
 import com.example.restaurant.dto.response.menu.MenuItemResponse;
+import com.example.restaurant.entity.management.Restaurant;
 import com.example.restaurant.entity.menu.MenuCategory;
 import com.example.restaurant.entity.menu.MenuItem;
+import com.example.restaurant.repository.management.RestaurantRepository;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class MenuItemMapper {
+    private final RestaurantRepository restaurantRepository;
 
     public MenuItemResponse toMenuItemResponse(MenuItem menuItem) {
+        return toMenuItemResponse(menuItem,
+                restaurantRepository.findSingleton().orElseThrow().getCurrency());
+    }
+
+    private MenuItemResponse toMenuItemResponse(MenuItem menuItem, Restaurant.Currency currency) {
         return new MenuItemResponse(
                 menuItem.getId(),
                 menuItem.getNameDefaultLanguage(),
                 menuItem.getNameSecondLanguage(),
                 menuItem.getDescriptionDefaultLanguage(),
                 menuItem.getDescriptionSecondLanguage(),
-                menuItem.getIngredientsDefaultLanguage(),
-                menuItem.getIngredientsSecondLanguage(),
+                menuItem.getIngredientsDefaultLanguage() == null ? List.of()
+                        : List.copyOf(menuItem.getIngredientsDefaultLanguage()),
+                menuItem.getIngredientsSecondLanguage() == null ? List.of()
+                        : List.copyOf(menuItem.getIngredientsSecondLanguage()),
                 menuItem.isAllergenic(),
                 menuItem.isVegetarian(),
                 menuItem.isVegan(),
@@ -29,15 +41,18 @@ public class MenuItemMapper {
                 menuItem.getWeightGrams(),
                 menuItem.getPrice(),
                 getImageId(menuItem),
-                getMenuCategoryId(menuItem)
+                getMenuCategoryId(menuItem),
+                currency
         );
     }
 
     public List<MenuItemResponse> toMenuItemResponseList(List<MenuItem> menuItems) {
         List<MenuItemResponse> menuItemResponseList = new ArrayList<>();
+        Restaurant.Currency currency = restaurantRepository.findSingleton().orElseThrow()
+                .getCurrency();
 
         for (MenuItem menuItem : menuItems) {
-            menuItemResponseList.add(toMenuItemResponse(menuItem));
+            menuItemResponseList.add(toMenuItemResponse(menuItem, currency));
         }
 
         return menuItemResponseList;

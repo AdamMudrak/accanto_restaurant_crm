@@ -1,5 +1,6 @@
 package com.example.restaurant.dto.response.order;
 
+import com.example.restaurant.entity.management.Restaurant;
 import com.example.restaurant.entity.order.Order;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
@@ -13,6 +14,8 @@ import lombok.Setter;
 public class OrderResponse {
     @Schema(description = "Order id.", example = "1")
     private Long id;
+    @Schema(description = "Order currency. Null only for unreconciled historical orders.")
+    private Restaurant.Currency currency;
     @Schema(description = "Public order UUID.", example = "00000000-0000-0000-0000-000000000101")
     private String uuid;
     @Schema(description = "Order status.", example = "CLOSED")

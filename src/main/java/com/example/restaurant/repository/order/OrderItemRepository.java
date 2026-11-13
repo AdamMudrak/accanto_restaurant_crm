@@ -7,8 +7,15 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
+    Optional<OrderItem> findByGuestIdAndRequestKey(Long guestId, String requestKey);
+
+    @Query("SELECT i.order.id FROM OrderItem i WHERE i.id = :id")
+    Optional<Long> findOrderIdByItemId(@Param("id") Long id);
+
     Optional<OrderItem> findByIdAndOrder_Status(Long orderItemId, Order.OrderStatus orderStatus);
 
     List<OrderItem> findAllByOrderId(Long orderId);

@@ -54,8 +54,29 @@ public class OrderItem {
     private String clientNote;
     private String employeeNote;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private FulfillmentStatus fulfillmentStatus = FulfillmentStatus.ORDERED;
+    @Column(length = 128)
+    private String requestKey;
+    @Column(length = 64)
+    private String requestFingerprint;
+
     public OrderItem(Long id) {
         this.id = id;
+    }
+
+    public void setStatus(OrderItemStatus status) {
+        this.status = status;
+        if (status != OrderItemStatus.PAID_CARD && status != OrderItemStatus.PAID_CASH) {
+            this.fulfillmentStatus = FulfillmentStatus.valueOf(status.name());
+        } else if (fulfillmentStatus == FulfillmentStatus.ORDERED) {
+            this.fulfillmentStatus = FulfillmentStatus.CONFIRMED;
+        }
+    }
+
+    public enum FulfillmentStatus {
+        ORDERED, CONFIRMED, SERVED, CANCELED
     }
 
     public enum OrderItemStatus {

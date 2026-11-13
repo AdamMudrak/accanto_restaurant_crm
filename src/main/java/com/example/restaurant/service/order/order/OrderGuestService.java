@@ -8,6 +8,7 @@ import com.example.restaurant.entity.menu.MenuItem;
 import com.example.restaurant.entity.order.Guest;
 import com.example.restaurant.entity.order.Order;
 import com.example.restaurant.entity.order.OrderItem;
+import com.example.restaurant.exception.types.badrequest.InvalidRequestKeyException;
 import com.example.restaurant.exception.types.conflict.GuestIllegalStateException;
 import com.example.restaurant.exception.types.conflict.ItemIllegalStateException;
 import com.example.restaurant.exception.types.notfound.GuestNotFoundException;
@@ -22,6 +23,10 @@ import com.example.restaurant.repository.order.OrderItemRepository;
 import com.example.restaurant.repository.order.OrderRepository;
 import com.example.restaurant.service.utils.CookieExtractor;
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +44,10 @@ public class OrderGuestService {
 
     @Transactional(readOnly = true)
     public CurrentGuestOrderResponse getCurrentOrder(HttpServletRequest request) {
-        Order order = findOrderByUuid(request);
+        Order order = orderRepository.findByUuidAndStatus(
+                CookieExtractor.extractCookieValueByName(request, "orderUuid"),
+                Order.OrderStatus.OPENED)
+                .orElseThrow(() -> new OrderNotFoundException("Open order not found"));
         Guest guest = findGuest(request);
         validateGuestBelongsToOrder(guest, order);
 
@@ -51,6 +59,19 @@ public class OrderGuestService {
         Order order = findOrderByUuid(request);
         Guest guest = findGuest(request);
         validateGuestBelongsToOrder(guest, order);
+        String key = request.getHeader("Idempotency-Key");
+        if (key == null || !key.matches("[A-Za-z0-9_.:-]{1,128}")) {
+            throw new InvalidRequestKeyException();
+        }
+        String fingerprint = fingerprint(addOrderItemRequest);
+        var existing = orderItemRepository.findByGuestIdAndRequestKey(guest.getId(), key);
+        if (existing.isPresent()) {
+            if (!fingerprint.equals(existing.get().getRequestFingerprint())) {
+                throw new ItemIllegalStateException(
+                        "Idempotency key was used for another request.");
+            }
+            return getCurrentGuestOrderResponse(order, guest);
+        }
         MenuItem menuItem = findMenuItem(addOrderItemRequest.menuItemId());
 
         int currentQuantity =
@@ -66,6 +87,8 @@ public class OrderGuestService {
         OrderItem orderItem = orderItemMapper.toCreateOrderItem(
                 guest, order, menuItem, addOrderItemRequest);
 
+        orderItem.setRequestKey(key);
+        orderItem.setRequestFingerprint(fingerprint);
         orderItemRepository.save(orderItem);
         orderItemRepository.flush();
 
@@ -102,10 +125,22 @@ public class OrderGuestService {
         return getCurrentGuestOrderResponse(order, guest);
     }
 
+    private String fingerprint(AddOrderItemRequest request) {
+        try {
+            String value = request.menuItemId() + ":" + request.quantity() + ":"
+                    + (request.clientComment() == null ? "null"
+                            : "text:" + request.clientComment());
+            return HexFormat.of().formatHex(MessageDigest
+                    .getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
     private Order findOrderByUuid(HttpServletRequest request) {
         String orderUuid = CookieExtractor.extractCookieValueByName(request, "orderUuid");
         return orderRepository
-                .findByUuidAndStatus(
+                .lockByUuidAndStatus(
                         orderUuid, Order.OrderStatus.OPENED)
                 .orElseThrow(() -> new OrderNotFoundException(
                         "No opened with uuid: " + orderUuid + " found."));

@@ -1,6 +1,5 @@
 package com.example.restaurant.mapper.payment;
 
-import com.example.restaurant.entity.management.Restaurant;
 import com.example.restaurant.entity.order.Order;
 import com.example.restaurant.entity.payment.Payment;
 import com.example.restaurant.service.payment.stripe.dto.request.StripeCheckoutSessionRequest;
@@ -21,14 +20,13 @@ public class PaymentToStripeMapper {
 
     public StripeCheckoutSessionRequest toStripeCheckoutSessionRequest(
             Payment payment,
-            Order order,
-            Restaurant restaurant) {
+            Order order) {
         return new StripeCheckoutSessionRequest(
                 payment.getId(),
                 toCentsTotalAmount(payment)
                         .setScale(CENTS_SCALE, RoundingMode.UNNECESSARY)
                         .longValueExact(),
-                restaurant.getCurrency().name().toLowerCase(Locale.ROOT),
+                payment.getCurrency().name().toLowerCase(Locale.ROOT),
                 "Order payment " + order.getId(),
                 successUrl,
                 cancelUrl

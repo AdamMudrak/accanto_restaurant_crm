@@ -42,14 +42,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class PaymentService {
-    private static final int MAX_SYNC_ATTEMPTS = 3;
-    private static final long MONOBANK_PAYMENT_VALIDITY_SECONDS = 900L;
     private static final int MAX_SYNC_ERROR_LENGTH = 1024;
     private final OrderRepository orderRepository;
     private final GuestRepository guestRepository;
@@ -60,13 +60,30 @@ public class PaymentService {
     private final PaymentToStripeMapper paymentToStripeMapper;
     private final PaymentProviderStrategy paymentProviderStrategy;
     private final RestaurantRepository restaurantRepository;
-    private final PaymentOrderItemService paymentOrderItemService;
+    private final PaymentSettlementService settlementService;
+    private final TransactionTemplate transactionTemplate;
+
+    public PaymentResponse syncPayment(Long id) {
+        Payment payment = settlementService.lockById(id);
+        if (payment.getMethod() != Payment.PaymentMethod.ONLINE
+                || payment.getProviderPaymentId() == null) {
+            throw new ItemIllegalStateException("Provider invoice is unavailable.");
+        }
+        syncPendingPayment(payment);
+        return paymentMapper.toPaymentResponse(payment);
+    }
 
     @Transactional(readOnly = true)
     public PaymentListResponse getPayments(Pageable pageable) {
         Page<Payment> payments = paymentRepository.findAll(pageable);
 
         return toPaymentListResponse(payments, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentListResponse getPaymentsNeedingReconciliation(Pageable pageable) {
+        return toPaymentListResponse(
+                paymentRepository.findNeedingReconciliation(pageable), pageable);
     }
 
     @Transactional(readOnly = true)
@@ -85,45 +102,80 @@ public class PaymentService {
         return toPaymentListResponse(payments, pageable);
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public PaymentResponse pay(PaymentRequest paymentRequest, HttpServletRequest request) {
+        PreparedPayment prepared = transactionTemplate.execute(ignored ->
+                preparePayment(paymentRequest, request));
+        if (prepared.existing() != null) {
+            return prepared.existing();
+        }
+        try {
+            return initializeProviderPayment(prepared);
+        } catch (RuntimeException exception) {
+            transactionTemplate.executeWithoutResult(ignored -> {
+                Payment payment = settlementService.lockById(prepared.id());
+                if (payment.getProviderPaymentId() == null) {
+                    payment.setReconciliationIssue("Provider creation result is uncertain; "
+                            + "verify provider reference " + payment.getId() + " before retrying.");
+                }
+            });
+            throw exception;
+        }
+    }
+
+    private PreparedPayment preparePayment(PaymentRequest paymentRequest,
+                                            HttpServletRequest request) {
         Order order = findOrderByUuid(request);
+        Guest guest = findGuest(request);
+        if (!guest.getOrder().getId().equals(order.getId())) {
+            throw new ItemIllegalStateException("Guest does not belong to this order.");
+        }
         List<OrderItem> orderItems = findOrderItemsForPayment(
                 paymentRequest.orderItemsIds(), order.getId());
         Optional<Payment> existingPayment = findExistingPayment(orderItems, paymentRequest);
 
         validateOrderItemsArePayable(orderItems);
 
-        if (existingPayment.isPresent()
-                && existingPayment.get().getStatus() == Payment.PaymentStatus.PENDING) {
-            return paymentMapper.toPaymentResponse(existingPayment.get());
+        if (existingPayment.isPresent()) {
+            return new PreparedPayment(existingPayment.get().getId(),
+                    paymentMapper.toPaymentResponse(existingPayment.get()), null, null);
         }
 
-        Payment payment = existingPayment.orElseGet(Payment::new);
+        Payment payment = new Payment();
         BigDecimal amount = getTotalAmountForItems(orderItems);
         BigDecimal tipAmount = paymentRequest.tipAmount() != null
                 ? paymentRequest.tipAmount()
                 : BigDecimal.ZERO;
         validateTotalAmount(amount, tipAmount);
-        prepareOrderItemsForPayment(orderItems, payment);
-
         Restaurant restaurant = findRestaurant();
-        Guest guest = findGuest(request);
+        if (order.getCurrency() == null) {
+            throw new ItemIllegalStateException(
+                    "Order currency requires historical reconciliation.");
+        }
         PaymentProviderType paymentProviderType = restaurant.getPaymentProvider();
         payment = paymentRepository.save(
                 paymentMapper.toPayment(
                         payment, order, guest, amount, tipAmount, paymentProviderType));
+        prepareOrderItemsForPayment(orderItems, payment);
         resetProviderState(payment);
         paymentRepository.flush();
 
-        return getPaymentProviderResponse(payment, order, restaurant);
+        return new PreparedPayment(payment.getId(), null,
+                paymentProviderType == PaymentProviderType.MONOBANK
+                        ? paymentToMonobankMapper.toMonobankInvoiceRequest(payment, order) : null,
+                paymentProviderType == PaymentProviderType.STRIPE
+                        ? paymentToStripeMapper.toStripeCheckoutSessionRequest(
+                                payment, order) : null);
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void syncPendingPayments() {
         paymentRepository
-                .findAllByStatusAndProviderPaymentIdIsNotNullAndSyncAttemptsLessThan(
-                        Payment.PaymentStatus.PENDING, MAX_SYNC_ATTEMPTS)
-                .forEach(this::syncPendingPayment);
-        expireOutdatedMonobankPayments();
+                .findAllByStatusAndMethodAndProviderPaymentIdIsNotNull(
+                        Payment.PaymentStatus.PENDING, Payment.PaymentMethod.ONLINE)
+                .stream().map(Payment::getId).toList()
+                .forEach(id -> transactionTemplate.executeWithoutResult(ignored ->
+                        syncPendingPayment(settlementService.lockById(id))));
     }
 
     private Restaurant findRestaurant() {
@@ -146,7 +198,7 @@ public class PaymentService {
     private Order findOrderByUuid(HttpServletRequest request) {
         String orderUuid = CookieExtractor.extractCookieValueByName(request, "orderUuid");
         return orderRepository
-                .findByUuidAndStatus(
+                .lockByUuidAndStatus(
                         orderUuid, Order.OrderStatus.OPENED)
                 .orElseThrow(() -> new OrderNotFoundException(
                         "No opened with uuid: " + orderUuid + " found."));
@@ -159,7 +211,7 @@ public class PaymentService {
     }
 
     private List<OrderItem> findOrderItemsForPayment(Set<Long> itemsIds, Long orderId) {
-        return itemsIds.stream()
+        return itemsIds.stream().sorted()
                 .map(itemId -> orderItemRepository.findByIdAndOrderId(itemId, orderId)
                         .orElseThrow(() -> new OrderItemNotFoundException(
                                 "Can't find order item with id: " + itemId
@@ -173,6 +225,7 @@ public class PaymentService {
         List<Payment> existingPayments = orderItems.stream()
                 .map(OrderItem::getPayment)
                 .filter(Objects::nonNull)
+                .filter(payment -> payment.getStatus() == Payment.PaymentStatus.PENDING)
                 .distinct()
                 .toList();
 
@@ -187,10 +240,6 @@ public class PaymentService {
 
         Payment payment = existingPayments.get(0);
         validateExistingPaymentMatchesRequest(payment, paymentRequest.orderItemsIds());
-
-        if (payment.getStatus() == Payment.PaymentStatus.SUCCEEDED) {
-            throw new ItemIllegalStateException("Selected order items are already paid.");
-        }
 
         return Optional.of(payment);
     }
@@ -260,46 +309,35 @@ public class PaymentService {
         }
     }
 
-    private PaymentResponse getPaymentProviderResponse(
-            Payment payment,
-            Order order,
-            Restaurant restaurant) {
-        return switch (payment.getProviderType()) {
-            case MONOBANK -> createMonobankPayment(payment, order);
-            case STRIPE -> createStripePayment(payment, order, restaurant);
-        };
+    private PaymentResponse initializeProviderPayment(PreparedPayment prepared) {
+        String providerId;
+        String pageUrl;
+        if (prepared.mono() != null) {
+            PaymentProvider<MonobankInvoiceRequest, MonobankInvoiceResponse,
+                    MonobankStatusRequest, MonobankStatusResponse> provider =
+                    paymentProviderStrategy.getPaymentProvider(PaymentProviderType.MONOBANK);
+            MonobankInvoiceResponse response = provider.pay(prepared.mono());
+            providerId = response.invoiceId();
+            pageUrl = response.pageUrl();
+        } else {
+            PaymentProvider<StripeCheckoutSessionRequest, StripeCheckoutSessionResponse,
+                    StripeStatusRequest, StripeCheckoutSessionResponse> provider =
+                    paymentProviderStrategy.getPaymentProvider(PaymentProviderType.STRIPE);
+            StripeCheckoutSessionResponse response = provider.pay(prepared.stripe());
+            providerId = response.id();
+            pageUrl = response.url();
+        }
+        return transactionTemplate.execute(ignored -> {
+            Payment payment = settlementService.lockById(prepared.id());
+            payment.setProviderPaymentId(providerId);
+            payment.setPaymentPageUrl(pageUrl);
+            return paymentMapper.toPaymentResponse(payment);
+        });
     }
 
-    private PaymentResponse createMonobankPayment(Payment payment, Order order) {
-        PaymentProvider<MonobankInvoiceRequest, MonobankInvoiceResponse,
-                MonobankStatusRequest, MonobankStatusResponse> paymentProvider =
-                paymentProviderStrategy.getPaymentProvider(PaymentProviderType.MONOBANK);
-        MonobankInvoiceRequest monoRequest =
-                paymentToMonobankMapper.toMonobankInvoiceRequest(payment, order);
-        MonobankInvoiceResponse response = paymentProvider.pay(monoRequest);
-
-        payment.setProviderPaymentId(response.invoiceId());
-        payment.setPaymentPageUrl(response.pageUrl());
-
-        return paymentMapper.toPaymentResponse(payment);
-    }
-
-    private PaymentResponse createStripePayment(
-            Payment payment,
-            Order order,
-            Restaurant restaurant) {
-        PaymentProvider<StripeCheckoutSessionRequest, StripeCheckoutSessionResponse,
-                StripeStatusRequest, StripeCheckoutSessionResponse> paymentProvider =
-                paymentProviderStrategy.getPaymentProvider(PaymentProviderType.STRIPE);
-        StripeCheckoutSessionRequest stripeRequest =
-                paymentToStripeMapper.toStripeCheckoutSessionRequest(payment, order, restaurant);
-        StripeCheckoutSessionResponse response = paymentProvider.pay(stripeRequest);
-
-        payment.setProviderPaymentId(response.id());
-        payment.setPaymentPageUrl(response.url());
-
-        return paymentMapper.toPaymentResponse(payment);
-    }
+    private record PreparedPayment(Long id, PaymentResponse existing,
+                                   MonobankInvoiceRequest mono,
+                                   StripeCheckoutSessionRequest stripe) {}
 
     private void refreshPaymentStatus(Payment payment) {
         switch (payment.getProviderType()) {
@@ -326,20 +364,6 @@ public class PaymentService {
         }
     }
 
-    private void expireOutdatedMonobankPayments() {
-        LocalDateTime expiredBefore = LocalDateTime.now()
-                .minusSeconds(MONOBANK_PAYMENT_VALIDITY_SECONDS);
-        paymentRepository.findAllByStatusAndProviderTypeAndCreatedAtBefore(
-                        Payment.PaymentStatus.PENDING,
-                        PaymentProviderType.MONOBANK,
-                        expiredBefore)
-                .stream()
-                .filter(payment -> payment.getProviderPaymentId() == null
-                        || payment.getProviderPaymentId().isBlank()
-                        || payment.getSyncAttempts() >= MAX_SYNC_ATTEMPTS)
-                .forEach(payment -> payment.setStatus(Payment.PaymentStatus.EXPIRED));
-    }
-
     private String toSyncError(RuntimeException exception) {
         String error = exception.getClass().getSimpleName() + ": " + exception.getMessage();
         if (error.length() > MAX_SYNC_ERROR_LENGTH) {
@@ -356,16 +380,12 @@ public class PaymentService {
         MonobankStatusResponse response = paymentProvider.getStatus(
                 new MonobankStatusRequest(payment.getProviderPaymentId()));
 
-        payment.setStatus(toPaymentStatus(response.status()));
-        payment.setProviderModifiedAt(response.modifiedDate());
+        settlementService.applyStatus(payment, toPaymentStatus(response.status()),
+                response.modifiedDate());
         payment.setFailureReason(response.failureReason());
         payment.setProviderErrorCode(response.errCode());
         payment.setProviderErrorText(response.errText());
 
-        if (response.status() == MonobankStatusResponse.Status.success) {
-            payment.setCompletedAt(LocalDateTime.now());
-            paymentOrderItemService.markItemsAsPaid(payment);
-        }
     }
 
     private void refreshStripeStatus(Payment payment) {
@@ -375,11 +395,7 @@ public class PaymentService {
         StripeCheckoutSessionResponse response =
                 paymentProvider.getStatus(new StripeStatusRequest(payment.getProviderPaymentId()));
 
-        payment.setStatus(toPaymentStatus(response));
-        if (payment.getStatus() == Payment.PaymentStatus.SUCCEEDED) {
-            payment.setCompletedAt(LocalDateTime.now());
-            paymentOrderItemService.markItemsAsPaid(payment);
-        }
+        settlementService.applyStatus(payment, toPaymentStatus(response), null);
     }
 
     private Payment.PaymentStatus toPaymentStatus(MonobankStatusResponse.Status status) {

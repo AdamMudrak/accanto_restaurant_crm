@@ -23,6 +23,7 @@ services:
       dockerfile: Dockerfile.local
     environment:
       SERVER_PORT: "8083"
+      SPRING_LIQUIBASE_CONTEXTS: ${SPRING_LIQUIBASE_CONTEXTS:-demo}
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-restaurant}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-restaurant}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-restaurant}

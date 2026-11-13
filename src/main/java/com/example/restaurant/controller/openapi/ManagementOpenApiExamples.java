@@ -139,6 +139,7 @@ public final class ManagementOpenApiExamples {
                 "id": 15,
                 "uuid": "550e8400-e29b-41d4-a716-446655440000",
                 "orderStatus": "OPENED",
+                "currency": "UAH",
                 "diningTableId": 1,
                 "employeeId": 2,
                 "createdAt": "2026-08-08T19:30:00",
@@ -176,6 +177,7 @@ public final class ManagementOpenApiExamples {
                     "id": 15,
                     "uuid": "550e8400-e29b-41d4-a716-446655440000",
                     "orderStatus": "OPENED",
+                    "currency": "UAH",
                     "diningTableId": 1,
                     "employeeId": 2,
                     "createdAt": "2026-08-08T19:30:00",
@@ -202,6 +204,7 @@ public final class ManagementOpenApiExamples {
                   "id": 15,
                   "uuid": "550e8400-e29b-41d4-a716-446655440000",
                   "orderStatus": "OPENED",
+                  "currency": "UAH",
                   "diningTableId": 1,
                   "employeeId": 2,
                   "createdAt": "2026-08-08T19:30:00",
@@ -424,6 +427,7 @@ public final class ManagementOpenApiExamples {
                 "isVegan": false,
                 "maxQuantityPerPerson": 4,
                 "price": 105.00,
+                "currency": "UAH",
                 "imageId": 4,
                 "childCategoryId": 3
               },
@@ -457,6 +461,7 @@ public final class ManagementOpenApiExamples {
                     "isVegan": false,
                     "maxQuantityPerPerson": 4,
                     "price": 105.00,
+                    "currency": "UAH",
                     "imageId": 4,
                     "childCategoryId": 3
                   }

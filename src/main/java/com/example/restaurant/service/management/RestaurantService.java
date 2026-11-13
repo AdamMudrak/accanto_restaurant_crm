@@ -3,12 +3,17 @@ package com.example.restaurant.service.management;
 import com.example.restaurant.dto.response.management.RestaurantResponse;
 import com.example.restaurant.entity.image.Image;
 import com.example.restaurant.entity.management.Restaurant;
+import com.example.restaurant.entity.order.Order;
+import com.example.restaurant.exception.types.badrequest.InvalidTimeZoneException;
+import com.example.restaurant.exception.types.conflict.OrderIllegalStateException;
 import com.example.restaurant.exception.types.notfound.RestaurantNotFoundException;
 import com.example.restaurant.mapper.management.RestaurantMapper;
 import com.example.restaurant.repository.management.RestaurantRepository;
+import com.example.restaurant.repository.order.OrderRepository;
 import com.example.restaurant.service.image.ImageService;
 import com.example.restaurant.service.payment.PaymentProviderType;
 import jakarta.transaction.Transactional;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,6 +25,7 @@ public class RestaurantService {
     private final RestaurantRepository restaurantRepository;
     private final RestaurantMapper restaurantMapper;
     private final ImageService imageService;
+    private final OrderRepository orderRepository;
 
     public RestaurantResponse getRestaurant() {
         return restaurantMapper.toResponse(findRestaurant());
@@ -29,10 +35,33 @@ public class RestaurantService {
     public RestaurantResponse updateRestaurant(
             String name,
             Restaurant.DefaultRegion defaultRegion,
+            boolean confirmMenuPrices,
             MultipartFile logo,
             MultipartFile backgroundImage) {
-        Restaurant restaurant = findRestaurant();
+        Restaurant restaurant = restaurantRepository.lockSingleton().orElseThrow();
+        if (defaultRegion != null && defaultRegion != restaurant.getDefaultRegion()) {
+            if (orderRepository.existsByStatus(Order.OrderStatus.OPENED)) {
+                throw new OrderIllegalStateException("Close all orders before changing currency.");
+            }
+            if (!confirmMenuPrices) {
+                throw new OrderIllegalStateException(
+                        "Confirm menu prices in the new currency using confirmMenuPrices=true.");
+            }
+        }
         updatePresentFields(restaurant, name, defaultRegion, logo, backgroundImage);
+        return restaurantMapper.toResponse(restaurantRepository.save(restaurant));
+    }
+
+    public RestaurantResponse updateTimeZone(String timeZone) {
+        try {
+            if (!ZoneId.getAvailableZoneIds().contains(timeZone)) {
+                throw new IllegalArgumentException();
+            }
+        } catch (RuntimeException exception) {
+            throw new InvalidTimeZoneException();
+        }
+        Restaurant restaurant = restaurantRepository.lockSingleton().orElseThrow();
+        restaurant.setTimeZone(timeZone);
         return restaurantMapper.toResponse(restaurantRepository.save(restaurant));
     }
 

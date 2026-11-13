@@ -24,10 +24,11 @@ jobs:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_DATABASE: restaurant
+          MYSQL_DATABASE: restaurant_test
           MYSQL_USER: restaurant
           MYSQL_PASSWORD: restaurant
           MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_HOST: "%"
         ports:
           - 3307:3306
         options: >-
@@ -37,7 +38,12 @@ jobs:
           --health-retries=20
 
     env:
-      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3307/restaurant
+      TEST_DATABASE_URL: jdbc:mysql://127.0.0.1:3307/restaurant_test
+      TEST_DATABASE_USERNAME: restaurant
+      TEST_DATABASE_PASSWORD: restaurant
+      TEST_DATABASE_ADMIN_URL: jdbc:mysql://127.0.0.1:3307/mysql
+      TEST_DATABASE_ADMIN_PASSWORD: root
+      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3307/restaurant_test
       SPRING_DATASOURCE_USERNAME: restaurant
       SPRING_DATASOURCE_PASSWORD: restaurant
       JWT_ACCESS_SECRET_KEY: github-actions-access-secret-key-at-least-32-bytes
@@ -67,12 +73,17 @@ jobs:
           java-version: "25"
           cache: maven
 
-      - name: Run tests
-        if: github.event_name == 'pull_request'
-        run: ./mvnw -B test
+      - name: Verify business paths and package application
+        run: ./mvnw -B -Pcoverage verify
 
-      - name: Package application
-        run: ./mvnw -B package -DskipTests
+      - name: Upload test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-reports
+          path: |
+            target/surefire-reports/
+            target/site/jacoco/
 
       - name: Build Docker image
         if: github.event_name == 'push'

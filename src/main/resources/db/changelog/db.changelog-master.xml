@@ -5,7 +5,6 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <include file="db/changelog/changes/000-clean-schema.xml"/>
     <include file="db/changelog/changes/001-create-roles.xml"/>
     <include file="db/changelog/changes/002-create-images.xml"/>
     <include file="db/changelog/changes/003-create-employees.xml"/>
@@ -23,18 +22,21 @@
     <include file="db/changelog/changes/015-create-menu-item-ingredients-second-language.xml"/>
     <include file="db/changelog/changes/016-add-monobank-webhook-support.xml"/>
     <include file="db/changelog/changes/101-seed-roles.sql"/>
-    <include file="db/changelog/changes/102-seed-working-days.sql"/>
-    <include file="db/changelog/changes/103-seed-images.sql"/>
-    <include file="db/changelog/changes/104-seed-restaurants.sql"/>
-    <include file="db/changelog/changes/105-seed-dining-tables.sql"/>
-    <include file="db/changelog/changes/106-seed-menu-categories.sql"/>
-    <include file="db/changelog/changes/107-seed-menu-items.sql"/>
-    <include file="db/changelog/changes/108-seed-menu-item-ingredients-default-language.sql"/>
-    <include file="db/changelog/changes/109-seed-menu-item-ingredients-second-language.sql"/>
-    <include file="db/changelog/changes/110-seed-employees.sql"/>
-    <include file="db/changelog/changes/111-seed-employee-shifts.sql"/>
-    <include file="db/changelog/changes/112-seed-orders.sql"/>
-    <include file="db/changelog/changes/113-seed-guests.sql"/>
-    <include file="db/changelog/changes/114-seed-payments.sql"/>
-    <include file="db/changelog/changes/115-seed-order-items.sql"/>
+    <include file="db/changelog/changes/102-seed-working-days.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/103-seed-images.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/104-seed-restaurants.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/105-seed-dining-tables.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/106-seed-menu-categories.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/107-seed-menu-items.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/108-seed-menu-item-ingredients-default-language.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/109-seed-menu-item-ingredients-second-language.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/110-seed-employees.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/111-seed-employee-shifts.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/112-seed-orders.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/113-seed-guests.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/114-seed-payments.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/115-seed-order-items.sql" contextFilter="@demo"/>
+    <include file="db/changelog/changes/017-business-workflows.xml"/>
+    <include file="db/changelog/changes/018-demo-currency.xml"/>
+    <include file="db/changelog/changes/019-payment-operations.xml"/>
 </databaseChangeLog>

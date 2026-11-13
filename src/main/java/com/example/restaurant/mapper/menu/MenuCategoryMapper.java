@@ -34,31 +34,8 @@ public class MenuCategoryMapper {
         return menuCategory;
     }
 
-    public MenuCategory toUpdateParentEntity(Long parentCategoryId, MenuCategoryRequest request) {
-        MenuCategory menuCategory = new MenuCategory();
-        menuCategory.setId(parentCategoryId);
-        if (request.nameDefaultLanguage() != null) {
-            menuCategory.setNameDefaultLanguage(request.nameDefaultLanguage());
-        }
-        if (request.nameSecondLanguage() != null) {
-            menuCategory.setNameSecondLanguage(request.nameSecondLanguage());
-        }
-        return menuCategory;
-    }
-
     public MenuCategory toChildEntity(Long parentCategoryId, MenuCategoryRequest request) {
         MenuCategory menuCategory = new MenuCategory();
-        menuCategory.setNameDefaultLanguage(request.nameDefaultLanguage());
-        menuCategory.setNameSecondLanguage(request.nameSecondLanguage());
-        menuCategory.setParentCategory(new MenuCategory(parentCategoryId));
-        return menuCategory;
-    }
-
-    public MenuCategory toUpdateChildEntity(Long childCategoryId,
-                                            Long parentCategoryId,
-                                            MenuCategoryRequest request) {
-        MenuCategory menuCategory = new MenuCategory();
-        menuCategory.setId(childCategoryId);
         menuCategory.setNameDefaultLanguage(request.nameDefaultLanguage());
         menuCategory.setNameSecondLanguage(request.nameSecondLanguage());
         menuCategory.setParentCategory(new MenuCategory(parentCategoryId));

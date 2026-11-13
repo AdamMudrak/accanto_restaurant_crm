@@ -6,22 +6,27 @@ import static com.example.restaurant.controller.openapi.ManagementOpenApiExample
 import static com.example.restaurant.controller.openapi.ManagementOpenApiExamples.NOT_FOUND_ERROR;
 import static com.example.restaurant.controller.openapi.ManagementOpenApiExamples.RESTAURANT_RESPONSE;
 
+import com.example.restaurant.dto.request.management.TimeZoneRequest;
 import com.example.restaurant.dto.response.ApiResponse;
 import com.example.restaurant.dto.response.management.RestaurantResponse;
 import com.example.restaurant.entity.management.Restaurant;
 import com.example.restaurant.service.management.RestaurantService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -111,14 +116,27 @@ public class RestaurantController {
     public ResponseEntity<ApiResponse<RestaurantResponse>> updateRestaurant(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Restaurant.DefaultRegion defaultRegion,
+            @Parameter(description = "Confirms menu prices in the new currency; no conversion.")
+            @RequestParam(defaultValue = "false") boolean confirmMenuPrices,
             @RequestPart(value = "logo", required = false) MultipartFile logo,
             @RequestPart(value = "backgroundImage", required = false) MultipartFile backgroundImage
     ) {
         RestaurantResponse restaurantResponse = restaurantService.updateRestaurant(
-                name, defaultRegion, logo, backgroundImage);
+                name, defaultRegion, confirmMenuPrices, logo, backgroundImage);
 
         return new ResponseEntity<>(
                 ApiResponse.success(
                         "Successfully updated restaurant.", restaurantResponse), HttpStatus.OK);
     }
+
+    @PreAuthorize("hasRole('ADMIN_EMPLOYEE')")
+    @PatchMapping("/this/time-zone")
+    @Operation(summary = "Select restaurant IANA time zone for business reporting")
+    public ApiResponse<RestaurantResponse> updateTimeZone(
+            @Valid @RequestBody
+            TimeZoneRequest request) {
+        return ApiResponse.success("Restaurant time zone updated.",
+                restaurantService.updateTimeZone(request.timeZone()));
+    }
+
 }

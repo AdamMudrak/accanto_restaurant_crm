@@ -10,12 +10,6 @@ public record MonobankWebhookRequest(
         String failureReason,
         String errCode,
         String errText,
-        Long amount,
-        Integer ccy,
-        Long finalAmount,
-        String reference,
-        String destination,
-        OffsetDateTime createdDate,
         OffsetDateTime modifiedDate
 ) {
     public enum Status {

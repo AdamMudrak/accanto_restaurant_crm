@@ -96,6 +96,8 @@ public class SecurityConfig {
 
     private RequestMatcher publicEndpointsMatcher() {
         return new OrRequestMatcher(
+                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/reviews"),
+                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/reviews/eligibility"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.OPTIONS, "/**"),
                 PathPatternRequestMatcher.pathPattern("/auth/finalize-employee-registration"),
                 PathPatternRequestMatcher.pathPattern("/auth/login"),

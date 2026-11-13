@@ -2,6 +2,9 @@ package com.example.restaurant.exception.handlers;
 
 import com.example.restaurant.dto.response.ApiResponse;
 import com.example.restaurant.exception.types.badrequest.InvalidImageException;
+import com.example.restaurant.exception.types.badrequest.InvalidRequestKeyException;
+import com.example.restaurant.exception.types.badrequest.InvalidTimeZoneException;
+import com.example.restaurant.exception.types.badrequest.MalformedWebhookException;
 import jakarta.validation.ConstraintViolationException;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,13 +15,25 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class BadRequestExceptionHandler {
+    @ExceptionHandler({ServletRequestBindingException.class,
+            MethodArgumentTypeMismatchException.class, MissingServletRequestPartException.class,
+            MalformedWebhookException.class,
+            InvalidTimeZoneException.class,
+            InvalidRequestKeyException.class})
+    public ResponseEntity<ApiResponse<Object>> handleInvalidRequest(Exception exception) {
+        return new ResponseEntity<>(ApiResponse.error(exception.getMessage()),
+                HttpStatus.BAD_REQUEST);
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Object>> handleValidationException(

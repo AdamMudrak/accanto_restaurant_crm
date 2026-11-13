@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <include file="db/changelog/changes/000-clean-schema.xml"/>
+    <include file="db/changelog/changes/001-create-roles.xml"/>
+    <include file="db/changelog/changes/002-create-images.xml"/>
+    <include file="db/changelog/changes/003-create-employees.xml"/>
+    <include file="db/changelog/changes/004-create-working-days.xml"/>
+    <include file="db/changelog/changes/005-create-restaurants.xml"/>
+    <include file="db/changelog/changes/006-create-menu-categories.xml"/>
+    <include file="db/changelog/changes/007-create-menu-items.xml"/>
+    <include file="db/changelog/changes/008-create-dining-tables.xml"/>
+    <include file="db/changelog/changes/009-create-orders.xml"/>
+    <include file="db/changelog/changes/010-create-guests.xml"/>
+    <include file="db/changelog/changes/011-create-payments.xml"/>
+    <include file="db/changelog/changes/012-create-order-items.xml"/>
+    <include file="db/changelog/changes/013-create-uuid-tokens.xml"/>
+    <include file="db/changelog/changes/014-create-menu-item-ingredients-default-language.xml"/>
+    <include file="db/changelog/changes/015-create-menu-item-ingredients-second-language.xml"/>
+    <include file="db/changelog/changes/016-add-monobank-webhook-support.xml"/>
+    <include file="db/changelog/changes/101-seed-roles.sql"/>
+    <include file="db/changelog/changes/102-seed-working-days.sql"/>
+    <include file="db/changelog/changes/103-seed-images.sql"/>
+    <include file="db/changelog/changes/104-seed-restaurants.sql"/>
+    <include file="db/changelog/changes/105-seed-dining-tables.sql"/>
+    <include file="db/changelog/changes/106-seed-menu-categories.sql"/>
+    <include file="db/changelog/changes/107-seed-menu-items.sql"/>
+    <include file="db/changelog/changes/108-seed-menu-item-ingredients-default-language.sql"/>
+    <include file="db/changelog/changes/109-seed-menu-item-ingredients-second-language.sql"/>
+    <include file="db/changelog/changes/110-seed-employees.sql"/>
+    <include file="db/changelog/changes/111-seed-employee-shifts.sql"/>
+    <include file="db/changelog/changes/112-seed-orders.sql"/>
+    <include file="db/changelog/changes/113-seed-guests.sql"/>
+    <include file="db/changelog/changes/114-seed-payments.sql"/>
+    <include file="db/changelog/changes/115-seed-order-items.sql"/>
+</databaseChangeLog>

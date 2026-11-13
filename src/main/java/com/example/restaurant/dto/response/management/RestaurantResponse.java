@@ -1,6 +1,7 @@
 package com.example.restaurant.dto.response.management;
 
 import com.example.restaurant.entity.management.Restaurant;
+import com.example.restaurant.service.payment.PaymentProviderType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "Restaurant profile returned by the API.")
@@ -21,5 +22,7 @@ public record RestaurantResponse(
         @Schema(description = "Currency used by the restaurant.", example = "UAH")
         Restaurant.Currency currency,
         @Schema(description = "Payment provider used by the restaurant.", example = "MONOBANK")
-        com.example.restaurant.service.payment.PaymentProviderType paymentProvider
+        PaymentProviderType paymentProvider,
+        @Schema(description = "IANA business time zone.", example = "Europe/Kyiv")
+        String timeZone
 ) {}

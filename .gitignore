@@ -34,3 +34,4 @@ build/
 
 ### My files ###
 .env.prod
+logs/

@@ -10,6 +10,7 @@ import com.example.restaurant.entity.menu.MenuItem;
 import com.example.restaurant.entity.order.Guest;
 import com.example.restaurant.entity.order.Order;
 import com.example.restaurant.entity.order.OrderItem;
+import com.example.restaurant.entity.payment.PaymentRefund;
 import com.example.restaurant.entity.user.Employee;
 import com.example.restaurant.exception.types.conflict.GuestIllegalStateException;
 import com.example.restaurant.exception.types.conflict.ItemIllegalStateException;
@@ -21,10 +22,14 @@ import com.example.restaurant.exception.types.notfound.OrderNotFoundException;
 import com.example.restaurant.mapper.order.GuestMapper;
 import com.example.restaurant.mapper.order.OrderItemMapper;
 import com.example.restaurant.mapper.order.OrderMapper;
+import com.example.restaurant.repository.management.RestaurantRepository;
 import com.example.restaurant.repository.menu.MenuItemRepository;
 import com.example.restaurant.repository.order.GuestRepository;
 import com.example.restaurant.repository.order.OrderItemRepository;
 import com.example.restaurant.repository.order.OrderRepository;
+import com.example.restaurant.repository.user.EmployeeRepository;
+import com.example.restaurant.service.payment.CashPaymentService;
+import com.example.restaurant.service.payment.PaymentSettlementService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -53,6 +58,20 @@ public class OrderEmployeeService {
     private final GuestMapper guestMapper;
     private final GuestRepository guestRepository;
     private final MenuItemRepository menuItemRepository;
+    private final CashPaymentService cashPaymentService;
+    private final PaymentSettlementService settlementService;
+    private final RestaurantRepository restaurantRepository;
+    private final EmployeeRepository employeeRepository;
+
+    public OrderResponse reassignEmployee(Long orderId, Long employeeId) {
+        restaurantRepository.lockSingleton().orElseThrow();
+        Order order = findOrderById(orderId);
+        Employee employee = employeeRepository.findById(employeeId)
+                .filter(candidate -> !candidate.isDeleted() && candidate.isEmailConfirmed())
+                .orElseThrow(() -> new OrderIllegalStateException("Active employee required."));
+        order.setEmployee(employee);
+        return orderMapper.toOrderResponse(order);
+    }
 
     public OrderListResponse getAllOpenOrders(Pageable pageable) {
         Page<Order> orders = orderRepository.findAllByStatus(Order.OrderStatus.OPENED, pageable);
@@ -83,7 +102,8 @@ public class OrderEmployeeService {
 
     @Transactional(readOnly = true)
     public OrderResponse getOrderById(Long orderId) {
-        Order order = findOrderById(orderId);
+        Order order = orderRepository.findByIdAndStatus(orderId, Order.OrderStatus.OPENED)
+                .orElseThrow(() -> new OrderNotFoundException("Open order not found"));
 
         List<OrderItemsByGuestResponse> orderItemResponsesByGuest =
                 orderItemMapper.toResponseOrderItemsByGuests(
@@ -126,6 +146,14 @@ public class OrderEmployeeService {
     public List<OrderItemsByGuestResponse> updateOrderItem(Long orderItemId,
             UpdateOrderItemEmployeeRequest updateOrderItemEmployeeRequest,
             Employee employee) {
+        restaurantRepository.lockSingleton().orElseThrow();
+        Employee currentEmployee = employeeRepository.findById(employee.getId()).orElseThrow();
+        if (currentEmployee.isDeleted()) {
+            throw new OrderIllegalStateException("Deleted employees cannot manage orders.");
+        }
+        Long orderId = orderItemRepository.findOrderIdByItemId(orderItemId)
+                .orElseThrow(() -> new OrderItemNotFoundException("Order item not found"));
+        findOrderById(orderId);
         OrderItem orderItem = findOrderItemById(orderItemId);
 
         if (updateOrderItemEmployeeRequest.quantity() != null) {
@@ -161,13 +189,26 @@ public class OrderEmployeeService {
         return orderMapper.toOrderResponse(orderRepository.save(order));
     }
 
-    public OrderResponse closeOrderManually(Long id, CloseOrderManuallyRequest request) {
-        Order order = findOrderById(id);
+    public OrderResponse closeOrderManually(Long id, CloseOrderManuallyRequest request,
+                                           Employee employee) {
+        Order order = orderRepository.lockById(id).orElseThrow(() ->
+                new OrderNotFoundException("Order not found"));
+        if (order.getStatus() == Order.OrderStatus.CLOSED) {
+            return orderMapper.toOrderResponse(order);
+        }
+        settlementService.assertNoPendingPayments(order);
         OrderItem.OrderItemStatus statusToApply =
                 OrderItem.OrderItemStatus.valueOf(request.markUnpaidAs().name());
 
-        orderItemRepository.findAllByOrderId(order.getId())
-                .forEach(orderItem -> markUnpaidOrderItem(orderItem, statusToApply, request));
+        List<OrderItem> items = orderItemRepository.findAllByOrderId(order.getId());
+        if (request.employeeComment() != null && !request.employeeComment().isBlank()) {
+            items.stream().filter(item -> !FINAL_ORDER_ITEM_STATUSES.contains(item.getStatus()))
+                    .forEach(item -> item.setEmployeeNote(request.employeeComment()));
+        }
+        if (statusToApply == OrderItem.OrderItemStatus.PAID_CASH) {
+            cashPaymentService.record(items, employee);
+        }
+        items.forEach(orderItem -> markUnpaidOrderItem(orderItem, statusToApply, request));
         markOrderClosed(order);
 
         return orderMapper.toOrderResponse(orderRepository.save(order));
@@ -175,8 +216,8 @@ public class OrderEmployeeService {
 
     private Order findOrderById(Long orderId) {
         return orderRepository
-                .findByIdAndStatus(
-                        orderId, Order.OrderStatus.OPENED)
+                .lockById(orderId)
+                .filter(order -> order.getStatus() == Order.OrderStatus.OPENED)
                 .orElseThrow(() -> new OrderNotFoundException(
                         "No opened order with id" + orderId));
     }
@@ -205,7 +246,30 @@ public class OrderEmployeeService {
             Employee employee) {
         OrderItem.OrderItemStatus newStatus = OrderItem.OrderItemStatus.valueOf(
                 orderItemStatusDto.name());
+        if ((orderItem.getStatus() == OrderItem.OrderItemStatus.PAID_CARD
+                || orderItem.getStatus() == OrderItem.OrderItemStatus.PAID_CASH)
+                && newStatus == OrderItem.OrderItemStatus.SERVED) {
+            orderItem.setFulfillmentStatus(OrderItem.FulfillmentStatus.SERVED);
+            return;
+        }
+        if ((orderItem.getStatus() == OrderItem.OrderItemStatus.PAID_CARD
+                || orderItem.getStatus() == OrderItem.OrderItemStatus.PAID_CASH)
+                && newStatus == OrderItem.OrderItemStatus.CANCELED
+                && orderItem.getPayment() != null && orderItem.getPayment().getRefund() != null
+                && orderItem.getPayment().getRefund().getStatus()
+                == PaymentRefund.Status.SUCCEEDED) {
+            orderItem.setFulfillmentStatus(OrderItem.FulfillmentStatus.CANCELED);
+            return;
+        }
         validateOrderItemStatusTransition(orderItem.getStatus(), newStatus);
+        if (newStatus == OrderItem.OrderItemStatus.CANCELED
+                || newStatus == OrderItem.OrderItemStatus.PAID_CASH) {
+            settlementService.assertNoPendingPayment(orderItem);
+        }
+        if (newStatus == OrderItem.OrderItemStatus.PAID_CASH) {
+            cashPaymentService.record(List.of(orderItem), employee);
+            return;
+        }
         orderItem.setStatus(newStatus);
         assignEmployeeOnConfirmation(orderItem, newStatus, employee);
     }
@@ -249,8 +313,16 @@ public class OrderEmployeeService {
     }
 
     private void allowOnlyCloseOrder(Order order) {
+        settlementService.assertNoPendingPayments(order);
         orderItemRepository.findAllByOrderId(order.getId())
                 .forEach(orderItem -> {
+                    if (orderItem.getStatus() != OrderItem.OrderItemStatus.CANCELED
+                            && orderItem.getFulfillmentStatus()
+                            != OrderItem.FulfillmentStatus.SERVED
+                            && orderItem.getFulfillmentStatus()
+                            != OrderItem.FulfillmentStatus.CANCELED) {
+                        throw new OrderIllegalStateException("Serve paid items before closing.");
+                    }
                     if (!ALLOWED_STATUSES_TO_CLOSE_ORDER.contains(orderItem.getStatus())) {
                         throw new OrderIllegalStateException(
                                 "Cannot close order with unpaid order items.");

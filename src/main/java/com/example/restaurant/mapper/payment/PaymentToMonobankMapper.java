@@ -20,6 +20,10 @@ public class PaymentToMonobankMapper {
     private String webhookUrl;
 
     public MonobankInvoiceRequest toMonobankInvoiceRequest(Payment payment, Order order) {
+        if (payment.getCurrency()
+                != com.example.restaurant.entity.management.Restaurant.Currency.UAH) {
+            throw new IllegalArgumentException("Monobank payments require UAH.");
+        }
         return new MonobankInvoiceRequest(
                 toCoinsTotalAmount(payment)
                         .setScale(COINS_SCALE, RoundingMode.UNNECESSARY)
@@ -53,7 +57,8 @@ public class PaymentToMonobankMapper {
             builder.append(" З них чайові: ")
                     .append(payment.getTipAmount())
                     .append(" для співробітника за id: ")
-                    .append(order.getEmployee().getId());
+                    .append(order.getEmployee() == null
+                            ? "unassigned" : order.getEmployee().getId());
         }
 
         return builder.toString();

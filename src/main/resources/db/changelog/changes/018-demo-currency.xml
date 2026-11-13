@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                  https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="018-demo-currency" author="Adam Mudrak" context="@demo">
+        <sql dbms="mysql"><![CDATA[
+            UPDATE payments SET currency = 'EUR', reconciliation_issue = NULL
+                WHERE provider_payment_id = 'seed-stripe-payment-002';
+            UPDATE orders o JOIN payments p ON p.order_id = o.id
+                SET o.currency = p.currency
+                WHERE p.provider_payment_id = 'seed-stripe-payment-002';
+            UPDATE orders SET currency = 'UAH' WHERE currency IS NULL;
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

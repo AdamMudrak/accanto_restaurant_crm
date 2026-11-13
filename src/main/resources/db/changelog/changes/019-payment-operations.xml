@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+ <changeSet id="019-payment-operations" author="Adam Mudrak">
+  <sql dbms="mysql"><![CDATA[
+   ALTER TABLE restaurants ADD COLUMN time_zone VARCHAR(64) NOT NULL DEFAULT 'Europe/Kyiv';
+   ALTER TABLE order_items ADD COLUMN fulfillment_status VARCHAR(32) NOT NULL DEFAULT 'ORDERED',
+     ADD COLUMN request_key VARCHAR(128) COLLATE utf8mb4_bin NULL,
+     ADD COLUMN request_fingerprint VARCHAR(64) NULL,
+     ADD CONSTRAINT uk_guest_request UNIQUE (guest_id, request_key);
+   UPDATE order_items SET fulfillment_status = CASE
+     WHEN status IN ('PAID_CARD', 'PAID_CASH') THEN 'CONFIRMED' ELSE status END;
+   ALTER TABLE payments ADD COLUMN resolution_note VARCHAR(2000) NULL,
+     ADD COLUMN resolved_at DATETIME(6) NULL,
+     ADD COLUMN resolved_by_id BIGINT NULL,
+     ADD CONSTRAINT fk_payment_resolved_by FOREIGN KEY (resolved_by_id) REFERENCES employees(id);
+   CREATE TABLE payment_refunds (
+     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     payment_id BIGINT NOT NULL UNIQUE,
+     requested_by_id BIGINT NOT NULL,
+     reason VARCHAR(1000) NOT NULL,
+     amount DECIMAL(12,2) NOT NULL,
+     status VARCHAR(32) NOT NULL,
+     attempts INT NOT NULL DEFAULT 1,
+     provider_refund_id VARCHAR(255) NULL,
+     error VARCHAR(1024) NULL,
+     created_at DATETIME(6) NOT NULL,
+     completed_at DATETIME(6) NULL,
+     CONSTRAINT fk_refund_payment FOREIGN KEY (payment_id) REFERENCES payments(id),
+     CONSTRAINT fk_refund_employee FOREIGN KEY (requested_by_id) REFERENCES employees(id)
+   );
+  ]]></sql>
+ </changeSet>
+</databaseChangeLog>

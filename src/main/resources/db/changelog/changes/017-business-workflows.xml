@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                  https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="017-business-workflows" author="Adam Mudrak">
+        <sql dbms="mysql"><![CDATA[
+            ALTER TABLE orders ADD COLUMN currency VARCHAR(3) NULL;
+            ALTER TABLE payments
+                ADD COLUMN currency VARCHAR(3) NULL,
+                ADD COLUMN method VARCHAR(16) NOT NULL DEFAULT 'ONLINE',
+                ADD COLUMN recorded_by_id BIGINT NULL,
+                ADD COLUMN tip_employee_id BIGINT NULL,
+                ADD COLUMN reconstructed BIT NOT NULL DEFAULT 0,
+                ADD COLUMN reconciliation_issue VARCHAR(1024) NULL,
+                ADD COLUMN review_token VARCHAR(64) NULL,
+                MODIFY COLUMN provider_type VARCHAR(255) NULL,
+                ADD CONSTRAINT fk_payment_recorded_by
+                    FOREIGN KEY (recorded_by_id) REFERENCES employees(id),
+                ADD CONSTRAINT fk_payment_tip_employee
+                    FOREIGN KEY (tip_employee_id) REFERENCES employees(id),
+                ADD CONSTRAINT uk_payment_review_token UNIQUE (review_token);
+
+            UPDATE payments SET currency = 'UAH' WHERE provider_type = 'MONOBANK';
+            UPDATE payments p JOIN orders o ON o.id = p.order_id
+                SET p.tip_employee_id = o.employee_id;
+            UPDATE payments SET reconciliation_issue =
+                'Legacy currency requires provider verification'
+                WHERE currency IS NULL;
+            UPDATE orders o JOIN (
+                SELECT order_id, MIN(currency) AS currency FROM payments
+                GROUP BY order_id
+                HAVING COUNT(*) = COUNT(currency) AND COUNT(DISTINCT currency) = 1
+            ) p ON p.order_id = o.id SET o.currency = p.currency;
+
+            CREATE TABLE payment_items (
+                payment_id BIGINT NOT NULL,
+                order_item_id BIGINT NOT NULL,
+                PRIMARY KEY (payment_id, order_item_id),
+                CONSTRAINT fk_payment_items_payment FOREIGN KEY (payment_id) REFERENCES payments(id),
+                CONSTRAINT fk_payment_items_item FOREIGN KEY (order_item_id) REFERENCES order_items(id)
+            );
+            INSERT INTO payment_items (payment_id, order_item_id)
+                SELECT payment_id, id FROM order_items WHERE payment_id IS NOT NULL;
+
+            INSERT INTO payments (order_id, payer_guest_id, amount, tip_amount, currency,
+                method, provider_type, status, created_at, completed_at, reconstructed,
+                reconciliation_issue, sync_attempts, tip_paid)
+                SELECT i.order_id, i.guest_id, SUM(i.item_price_snapshot * i.quantity),
+                    0, o.currency, 'CASH', NULL, 'SUCCEEDED', o.created_at, NULL, 1,
+                    'Reconstructed cash receipt: verify currency and payment time', 0, 0
+                FROM order_items i JOIN orders o ON o.id = i.order_id
+                WHERE i.status = 'PAID_CASH' AND i.payment_id IS NULL
+                GROUP BY i.order_id, i.guest_id, o.currency, o.created_at;
+            UPDATE order_items i JOIN payments p ON p.order_id = i.order_id
+                AND p.payer_guest_id = i.guest_id AND p.method = 'CASH' AND p.reconstructed = 1
+                SET i.payment_id = p.id WHERE i.status = 'PAID_CASH' AND i.payment_id IS NULL;
+            INSERT IGNORE INTO payment_items (payment_id, order_item_id)
+                SELECT payment_id, id FROM order_items WHERE payment_id IS NOT NULL;
+
+            CREATE INDEX ix_payments_completed ON payments (status, completed_at, currency, method);
+            CREATE INDEX ix_orders_employee_status ON orders (employee_id, status);
+
+            CREATE TABLE reviews (
+                id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                guest_id BIGINT NOT NULL,
+                order_id BIGINT NOT NULL,
+                payment_id BIGINT NOT NULL,
+                rating INT NOT NULL,
+                comment VARCHAR(2000) NULL,
+                created_at DATETIME(6) NOT NULL,
+                CONSTRAINT uk_review_guest_order UNIQUE (guest_id, order_id),
+                CONSTRAINT fk_review_guest FOREIGN KEY (guest_id) REFERENCES guests(id),
+                CONSTRAINT fk_review_order FOREIGN KEY (order_id) REFERENCES orders(id),
+                CONSTRAINT fk_review_payment FOREIGN KEY (payment_id) REFERENCES payments(id),
+                CONSTRAINT ck_review_rating CHECK (rating BETWEEN 1 AND 5)
+            );
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

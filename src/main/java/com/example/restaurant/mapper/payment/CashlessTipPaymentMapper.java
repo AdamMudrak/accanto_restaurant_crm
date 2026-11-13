@@ -11,7 +11,7 @@ public class CashlessTipPaymentMapper {
 
     public CashlessTipPaymentResponse toResponse(Payment payment) {
         Order order = payment.getOrder();
-        Employee employee = order.getEmployee();
+        Employee employee = payment.getTipEmployee();
 
         return new CashlessTipPaymentResponse(
                 payment.getId(),
@@ -24,7 +24,7 @@ public class CashlessTipPaymentMapper {
                 payment.getTipAmount(),
                 payment.isTipPaid(),
                 payment.getTipPaidAt(),
-                payment.getCompletedAt());
+                payment.getCompletedAt(), payment.getCurrency());
     }
 
     private Long getEmployeeId(Employee employee) {

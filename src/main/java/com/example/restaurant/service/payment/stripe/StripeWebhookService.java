@@ -1,15 +1,14 @@
 package com.example.restaurant.service.payment.stripe;
 
 import com.example.restaurant.entity.payment.Payment;
+import com.example.restaurant.exception.types.badrequest.MalformedWebhookException;
 import com.example.restaurant.exception.types.unauthorized.InvalidTokenException;
 import com.example.restaurant.repository.payment.PaymentRepository;
-import com.example.restaurant.service.payment.PaymentOrderItemService;
+import com.example.restaurant.service.payment.PaymentSettlementService;
 import com.example.restaurant.service.payment.stripe.dto.request.StripeWebhookRequest;
 import com.example.restaurant.service.payment.stripe.dto.response.StripeCheckoutSessionResponse;
 import com.example.restaurant.service.utils.JsonConverter;
-import jakarta.persistence.EntityNotFoundException;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +27,7 @@ public class StripeWebhookService {
     private final PaymentRepository paymentRepository;
     private final StripeWebhookSignatureVerifier signatureVerifier;
     private final JsonConverter jsonConverter;
-    private final PaymentOrderItemService paymentOrderItemService;
+    private final PaymentSettlementService settlementService;
     @Value("${payment.stripe.webhook-secret}")
     private String webhookSecret;
 
@@ -36,22 +35,34 @@ public class StripeWebhookService {
     public void handle(String rawBody, String signature) {
         verifySignature(rawBody, signature);
 
-        StripeWebhookRequest webhook = jsonConverter.fromJson(rawBody, StripeWebhookRequest.class);
+        StripeWebhookRequest webhook;
+        try {
+            webhook = jsonConverter.fromJson(rawBody, StripeWebhookRequest.class);
+        } catch (IllegalArgumentException exception) {
+            throw new MalformedWebhookException();
+        }
+        if (webhook == null || webhook.type() == null) {
+            throw new MalformedWebhookException();
+        }
         if (!isSupportedEvent(webhook.type())) {
             return;
         }
 
+        if (webhook.data() == null) {
+            throw new MalformedWebhookException();
+        }
         StripeCheckoutSessionResponse session = webhook.data().object();
-        Payment payment = paymentRepository.findByProviderPaymentId(session.id())
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Payment with stripe session id " + session.id() + " not found"));
+        if (session == null || session.id() == null || session.id().isBlank()) {
+            throw new MalformedWebhookException();
+        }
+        Payment payment = settlementService.lockByProviderId(session.id());
 
         if (isOldWebhook(payment, webhook)) {
             return;
         }
 
-        payment.setProviderModifiedAt(toOffsetDateTime(webhook.created()));
-        applyStatus(payment, webhook.type(), session);
+        settlementService.applyStatus(payment, toPaymentStatus(webhook.type(), session),
+                toOffsetDateTime(webhook.created()));
 
         paymentRepository.save(payment);
     }
@@ -67,7 +78,7 @@ public class StripeWebhookService {
     private boolean isOldWebhook(Payment payment, StripeWebhookRequest webhook) {
         return payment.getProviderModifiedAt() != null
                 && webhook.created() != null
-                && !toOffsetDateTime(webhook.created()).isAfter(payment.getProviderModifiedAt());
+                && toOffsetDateTime(webhook.created()).isBefore(payment.getProviderModifiedAt());
     }
 
     private boolean isSupportedEvent(String type) {
@@ -77,26 +88,22 @@ public class StripeWebhookService {
                 || SESSION_ASYNC_FAILED.equals(type);
     }
 
-    private void applyStatus(Payment payment, String type, StripeCheckoutSessionResponse session) {
+    private Payment.PaymentStatus toPaymentStatus(String type,
+                                                  StripeCheckoutSessionResponse session) {
         if ((SESSION_COMPLETED.equals(type) || SESSION_ASYNC_SUCCEEDED.equals(type))
                 && "paid".equals(session.paymentStatus())) {
-            payment.setStatus(Payment.PaymentStatus.SUCCEEDED);
-            payment.setCompletedAt(LocalDateTime.now());
-            paymentOrderItemService.markItemsAsPaid(payment);
-            return;
+            return Payment.PaymentStatus.SUCCEEDED;
         }
 
         if (SESSION_EXPIRED.equals(type) || "expired".equals(session.status())) {
-            payment.setStatus(Payment.PaymentStatus.EXPIRED);
-            return;
+            return Payment.PaymentStatus.EXPIRED;
         }
 
         if (SESSION_ASYNC_FAILED.equals(type)) {
-            payment.setStatus(Payment.PaymentStatus.FAILED);
-            return;
+            return Payment.PaymentStatus.FAILED;
         }
 
-        payment.setStatus(Payment.PaymentStatus.PENDING);
+        return Payment.PaymentStatus.PENDING;
     }
 
     private OffsetDateTime toOffsetDateTime(Long created) {

@@ -124,6 +124,7 @@ public class AuthService {
         return employeeMapper.toResponse(employeeRepository.save(employee));
     }
 
+    @Transactional(noRollbackFor = AccountNotActivatedException.class)
     public void login(LoginRequest request, HttpServletResponse response) {
         Employee employee;
 
@@ -146,6 +147,7 @@ public class AuthService {
         cookieRemover.removeAllTokenCookies(response);
     }
 
+    @Transactional(noRollbackFor = AccountNotActivatedException.class)
     public void startPasswordReset(TriggerEmailActionRequest request) {
         Employee employee;
 

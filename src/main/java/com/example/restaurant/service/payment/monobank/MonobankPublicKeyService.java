@@ -31,6 +31,10 @@ public class MonobankPublicKeyService {
             .build();
     @Value("${payment.monobank.x-token}")
     private String monoXToken;
+    @Value("${payment.monobank.base-url:https://api.monobank.ua}")
+    private String baseUrl = MonobankConstants.MONOBANK_BASE_URL;
+    @Value("${payment.provider.request-timeout:15s}")
+    private Duration requestTimeout = REQUEST_TIMEOUT;
 
     @Transactional
     public String getPublicKey() {
@@ -42,8 +46,8 @@ public class MonobankPublicKeyService {
     @Transactional
     public String refreshPublicKey() {
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(MonobankConstants.MONOBANK_BASE_URL + PUBKEY_PATH))
-                .timeout(REQUEST_TIMEOUT)
+                .uri(URI.create(baseUrl + PUBKEY_PATH))
+                .timeout(requestTimeout)
                 .header("X-Token", monoXToken)
                 .GET()
                 .build();
