@@ -34,6 +34,9 @@ import org.springframework.web.bind.annotation.RestController;
         + "and full receipt refunds. All routes require ADMIN_EMPLOYEE access.")
 @SecurityRequirement(name = "accessTokenCookie")
 @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+                description = "Operation completed; inspect the returned payment or refund status.",
+                useReturnTypeSchema = true),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
                 description = "Invalid request body, identifier, or parameter."),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403",
