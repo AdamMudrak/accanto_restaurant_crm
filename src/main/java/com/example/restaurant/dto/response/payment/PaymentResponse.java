@@ -34,10 +34,19 @@ public record PaymentResponse(
         LocalDateTime completedAt,
         @Schema(description = "Currency. Null for unresolved historical records.")
         Restaurant.Currency currency,
+        @Schema(description = "CASH or ONLINE receipt method.")
         Payment.PaymentMethod method,
+        @Schema(description = "True for reconstructed historical receipts; cannot be "
+                    + "refunded or reviewed.")
         boolean reconstructed,
+        @Schema(description = "Unresolved financial issue; null when no reconciliation is "
+                    + "required.")
         String reconciliationIssue,
+        @Schema(description = "Last provider synchronization failure; does not prove "
+                    + "payment failure.")
         String lastSyncError,
+        @Schema(description = "Recorded administrator resolution and supporting evidence.")
         String resolutionNote,
+        @Schema(description = "Current refund state; null if no refund exists.")
         PaymentRefund.Status refundStatus
 ) {}

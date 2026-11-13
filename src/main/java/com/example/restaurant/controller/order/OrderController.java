@@ -71,6 +71,8 @@ public class OrderController {
     @PutMapping("/{id}/employee")
     @PreAuthorize("hasRole('ADMIN_EMPLOYEE')")
     @Operation(summary = "Reassign an open order to an active employee",
+            description = "ADMIN_EMPLOYEE only. Target employee must be email-confirmed and "
+                    + "not deleted. Reassign orders before deleting their current employee.",
             security = @SecurityRequirement(name = "accessTokenCookie"))
     public ApiResponse<OrderResponse> reassignEmployee(@PathVariable @Positive Long id,
             @Valid @RequestBody ReassignOrderRequest request) {

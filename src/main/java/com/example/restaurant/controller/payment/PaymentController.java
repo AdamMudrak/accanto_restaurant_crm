@@ -44,9 +44,12 @@ public class PaymentController {
 
     @GetMapping("/reconciliation")
     @PreAuthorize("hasRole('ADMIN_EMPLOYEE')")
-    @Operation(summary = "List payments requiring administrator reconciliation")
+    @Operation(summary = "List payments requiring administrator reconciliation",
+            description = "ADMIN_EMPLOYEE only. Returns paginated receipts with unresolved "
+                    + "issues for invoice recovery or evidence-based resolution.",
+            security = @SecurityRequirement(name = "accessTokenCookie"))
     public ApiResponse<ApiResponse.PageResponse<PaymentResponse>> reconciliation(
-            Pageable pageable) {
+            @org.springdoc.core.annotations.ParameterObject Pageable pageable) {
         var result = paymentService.getPaymentsNeedingReconciliation(pageable);
         return ApiResponse.pageSuccess("Payments requiring review.", result.items(),
                 result.pageNumber(), result.pageSize(), result.totalElements());
@@ -111,8 +114,12 @@ public class PaymentController {
 
     @Operation(
             summary = "Create payment",
-            description = "Creates a payment for selected order items from guest cookies. "
-                    + "The provider is selected from restaurant settings.")
+            description = "Requires guestUuid and orderUuid cookies. Pays for selected confirmed "
+                    + "or served items using restaurant currency and provider settings. "
+                    + "Returns an online provider checkout URL. "
+                    + "Repeated requests for the same reserved item set reuse the pending payment. "
+                    + "Provider timeouts may leave an unresolved pending payment: synchronize "
+                    + "or reconcile it before accepting another payment for those items.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",

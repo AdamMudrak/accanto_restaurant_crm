@@ -131,7 +131,11 @@ public class RestaurantController {
 
     @PreAuthorize("hasRole('ADMIN_EMPLOYEE')")
     @PatchMapping("/this/time-zone")
-    @Operation(summary = "Select restaurant IANA time zone for business reporting")
+    @Operation(summary = "Select restaurant IANA time zone for business reporting",
+            description = "ADMIN_EMPLOYEE only. Accepts an IANA zone such as Europe/Kyiv. "
+                    + "Monthly report boundaries use this zone; stored timestamps remain UTC. "
+                    + "Invalid zones return HTTP 400.",
+            security = @SecurityRequirement(name = "accessTokenCookie"))
     public ApiResponse<RestaurantResponse> updateTimeZone(
             @Valid @RequestBody
             TimeZoneRequest request) {
