@@ -210,7 +210,7 @@ jobs:
               -e PAYMENT_STRIPE_SUCCESS_URL="$PAYMENT_STRIPE_SUCCESS_URL" \
               -e PAYMENT_STRIPE_CANCEL_URL="$PAYMENT_STRIPE_CANCEL_URL" \
               -e PAYMENT_STRIPE_WEBHOOK_SECRET="$PAYMENT_STRIPE_WEBHOOK_SECRET" \
-              -p "$APP_PORT:$APP_PORT" \
+              -p "127.0.0.1:$APP_PORT:$APP_PORT" \
               "$IMAGE_NAME:latest"
 
             rm -f "$TARGET/$APP_NAME.tar"
