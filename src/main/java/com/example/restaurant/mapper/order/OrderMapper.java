@@ -3,6 +3,7 @@ package com.example.restaurant.mapper.order;
 import com.example.restaurant.dto.response.order.OrderResponse;
 import com.example.restaurant.entity.order.DiningTable;
 import com.example.restaurant.entity.order.Order;
+import com.example.restaurant.entity.user.Employee;
 import com.example.restaurant.repository.management.RestaurantRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -40,10 +41,19 @@ public class OrderMapper {
         return orderResponse;
     }
 
+    public OrderResponse toEmployeeOrderResponse(Order order) {
+        OrderResponse response = toOrderResponse(order);
+        Employee employee = order.getEmployee();
+        if (employee != null) {
+            response.setEmployeeName(employee.getFirstName() + " " + employee.getLastName());
+        }
+        return response;
+    }
+
     public List<OrderResponse> toOrderResponseList(List<Order> orders) {
         List<OrderResponse> orderResponseList = new ArrayList<>();
         for (Order order : orders) {
-            orderResponseList.add(toOrderResponse(order));
+            orderResponseList.add(toEmployeeOrderResponse(order));
         }
         return orderResponseList;
     }

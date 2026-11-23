@@ -142,6 +142,7 @@ public final class ManagementOpenApiExamples {
                 "currency": "UAH",
                 "diningTableId": 1,
                 "employeeId": 2,
+                "employeeName": "Olena Kovalenko",
                 "createdAt": "2026-08-08T19:30:00",
                 "closedAt": null,
                 "orderItemsByGuests": [
@@ -180,6 +181,7 @@ public final class ManagementOpenApiExamples {
                     "currency": "UAH",
                     "diningTableId": 1,
                     "employeeId": 2,
+                    "employeeName": "Olena Kovalenko",
                     "createdAt": "2026-08-08T19:30:00",
                     "closedAt": null,
                     "orderItemsByGuests": null
