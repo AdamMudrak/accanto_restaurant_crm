@@ -70,7 +70,7 @@ public class OrderEmployeeService {
                 .filter(candidate -> !candidate.isDeleted() && candidate.isEmailConfirmed())
                 .orElseThrow(() -> new OrderIllegalStateException("Active employee required."));
         order.setEmployee(employee);
-        return orderMapper.toOrderResponse(order);
+        return orderMapper.toEmployeeOrderResponse(order);
     }
 
     public OrderListResponse getAllOpenOrders(Pageable pageable) {
@@ -109,7 +109,7 @@ public class OrderEmployeeService {
                 orderItemMapper.toResponseOrderItemsByGuests(
                         orderItemRepository.findAllByOrderId(order.getId()));
 
-        OrderResponse orderResponse = orderMapper.toOrderResponse(order);
+        OrderResponse orderResponse = orderMapper.toEmployeeOrderResponse(order);
         orderResponse.setOrderItemsByGuests(orderItemResponsesByGuest);
 
         return orderResponse;
@@ -186,7 +186,7 @@ public class OrderEmployeeService {
         Order order = findOrderById(id);
         allowOnlyCloseOrder(order);
 
-        return orderMapper.toOrderResponse(orderRepository.save(order));
+        return orderMapper.toEmployeeOrderResponse(orderRepository.save(order));
     }
 
     public OrderResponse closeOrderManually(Long id, CloseOrderManuallyRequest request,
@@ -194,7 +194,7 @@ public class OrderEmployeeService {
         Order order = orderRepository.lockById(id).orElseThrow(() ->
                 new OrderNotFoundException("Order not found"));
         if (order.getStatus() == Order.OrderStatus.CLOSED) {
-            return orderMapper.toOrderResponse(order);
+            return orderMapper.toEmployeeOrderResponse(order);
         }
         settlementService.assertNoPendingPayments(order);
         OrderItem.OrderItemStatus statusToApply =
@@ -211,7 +211,7 @@ public class OrderEmployeeService {
         items.forEach(orderItem -> markUnpaidOrderItem(orderItem, statusToApply, request));
         markOrderClosed(order);
 
-        return orderMapper.toOrderResponse(orderRepository.save(order));
+        return orderMapper.toEmployeeOrderResponse(orderRepository.save(order));
     }
 
     private Order findOrderById(Long orderId) {

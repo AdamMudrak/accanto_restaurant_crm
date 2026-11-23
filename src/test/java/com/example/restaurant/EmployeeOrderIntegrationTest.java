@@ -128,15 +128,29 @@ class EmployeeOrderIntegrationTest extends AbstractIntegrationTest {
         Fixture closed = fixture(Restaurant.Currency.UAH);
         closeCash(closed);
         Fixture open = fixture(Restaurant.Currency.UAH);
-        assertThat(request("GET", "/orders", null, employeeCookie()).data().path("meta").path("total")
-                .asLong()).isEqualTo(1);
-        assertThat(request("GET", "/orders/" + open.orderId(), null, employeeCookie()).status()).isEqualTo(200);
+        var employee = employees.findById(2L).orElseThrow();
+        String employeeName = employee.getFirstName() + " " + employee.getLastName();
+
+        var openOrders = request("GET", "/orders", null, employeeCookie());
+        assertThat(openOrders.status()).isEqualTo(200);
+        assertThat(openOrders.data().path("meta").path("total").asLong()).isEqualTo(1);
+        assertThat(openOrders.data().path("items").get(0).path("employeeName").asText())
+                .isEqualTo(employeeName);
+
+        var detail = request("GET", "/orders/" + open.orderId(), null, employeeCookie());
+        assertThat(detail.status()).isEqualTo(200);
+        assertThat(detail.data().path("employeeId").asLong()).isEqualTo(2L);
+        assertThat(detail.data().path("employeeName").asText()).isEqualTo(employeeName);
         assertThat(request("GET", "/orders/" + closed.orderId(), null, employeeCookie()).status()).isEqualTo(404);
         assertThat(orderService.getOrderHistory(Order.OrderStatus.CLOSED,
                 LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(1),
                 PageRequest.of(0, 10)).totalElements()).isEqualTo(1);
-        assertThat(request("GET", "/orders/history?status=CLOSED", null, employeeCookie()).data()
-                .path("meta").path("total").asLong()).isEqualTo(1);
+
+        var history = request("GET", "/orders/history?status=CLOSED", null, employeeCookie());
+        assertThat(history.status()).isEqualTo(200);
+        assertThat(history.data().path("meta").path("total").asLong()).isEqualTo(1);
+        assertThat(history.data().path("items").get(0).path("employeeName").asText())
+                .isEqualTo(employeeName);
         assertThat(request("GET", "/orders/" + closed.orderId() + "/payments", null, employeeCookie())
                 .data().path("meta").path("total").asLong()).isEqualTo(1);
     }

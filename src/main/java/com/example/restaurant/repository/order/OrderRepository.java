@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -28,8 +29,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT o.id FROM Order o WHERE o.diningTable.id = :tableId AND o.status = 'OPENED'")
     Optional<Long> findOpenOrderIdByTableId(@Param("tableId") Long tableId);
 
+    @EntityGraph(attributePaths = "employee")
     Page<Order> findAllByStatus(Order.OrderStatus orderStatus, Pageable pageable);
 
+    @EntityGraph(attributePaths = "employee")
     @Query("""
             SELECT o FROM Order o
             WHERE (:status IS NULL OR o.status = :status)

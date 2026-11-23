@@ -2,6 +2,7 @@ package com.example.restaurant.dto.response.order;
 
 import com.example.restaurant.entity.management.Restaurant;
 import com.example.restaurant.entity.order.Order;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +25,10 @@ public class OrderResponse {
     private Long diningTableId;
     @Schema(description = "Employee id assigned to the order.", example = "2")
     private Long employeeId;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "Assigned employee full name in staff responses.",
+            example = "Olena Kovalenko")
+    private String employeeName;
     @Schema(description = "Date and time when the order was created.")
     private LocalDateTime createdAt;
     @Schema(description = "Date and time when the order was closed.")
